@@ -1,3 +1,5 @@
+import { MaxUI } from "@maxhub/max-ui";
+import "@maxhub/max-ui/dist/styles.css";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -20,7 +22,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        {children}
+        <MaxUI>{children}</MaxUI>
       </body>
     </html>
   );
