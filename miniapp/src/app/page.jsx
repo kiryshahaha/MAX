@@ -1,3 +1,4 @@
+// page.jsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -11,6 +12,7 @@ export default function Home() {
   const [status, setStatus] = useState('');
   const [tasks, setTasks] = useState([]);
   const [reports, setReports] = useState([]);
+  const [profile, setProfile] = useState(null);
   const [activeTab, setActiveTab] = useState('tasks');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -25,7 +27,10 @@ export default function Home() {
     setStatus('⏳ Выполняется вход и получение данных...');
 
     try {
-      const endpoint = activeTab === 'tasks' ? '/api/post-tasks' : '/api/post-reports';
+      const endpoint = activeTab === 'tasks' ? '/api/post-tasks' : 
+                      activeTab === 'reports' ? '/api/post-reports' : 
+                      '/api/post-profile';
+      
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -45,6 +50,9 @@ export default function Home() {
         } else if (activeTab === 'reports' && data.reports) {
           setReports(data.reports);
           setStatus(`✅ Получено ${data.reports.length} отчетов`);
+        } else if (activeTab === 'profile' && data.profile) {
+          setProfile(data.profile);
+          setStatus(`✅ Профиль успешно получен`);
         } else {
           setStatus(data.message || 'Данные успешно получены');
         }
@@ -69,7 +77,10 @@ export default function Home() {
     setStatus('⏳ Обновляем данные...');
 
     try {
-      const endpoint = activeTab === 'tasks' ? '/api/tasks' : '/api/reports';
+      const endpoint = activeTab === 'tasks' ? '/api/post-tasks' : 
+                      activeTab === 'reports' ? '/api/post-reports' : 
+                      '/api/post-profile';
+      
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -89,6 +100,9 @@ export default function Home() {
         } else if (activeTab === 'reports' && data.reports) {
           setReports(data.reports);
           setStatus(`✅ Обновлено ${data.reports.length} отчетов`);
+        } else if (activeTab === 'profile' && data.profile) {
+          setProfile(data.profile);
+          setStatus(`✅ Профиль успешно обновлен`);
         } else {
           setStatus(data.message || 'Данные успешно обновлены');
         }
@@ -160,7 +174,7 @@ export default function Home() {
         </button>
       </form>
 
-      {/* Табы для переключения между задачами и отчетами */}
+      {/* Табы для переключения между задачами, отчетами и профилем */}
       <div className={styles.tabs}>
         <button 
           className={`${styles.tab} ${activeTab === 'tasks' ? styles.tabActive : ''}`}
@@ -174,12 +188,18 @@ export default function Home() {
         >
           Отчеты ({reports.length})
         </button>
+        <button 
+          className={`${styles.tab} ${activeTab === 'profile' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('profile')}
+        >
+          Профиль ({profile ? '✓' : '0'})
+        </button>
       </div>
       
       {status && (
         <div className={`${styles.status} ${getStatusClass()}`}>
           {status}
-          {(tasks.length > 0 || reports.length > 0) && (
+          {(tasks.length > 0 || reports.length > 0 || profile) && (
             <button 
               onClick={handleRefreshData}
               className={styles.refreshButton}
@@ -229,6 +249,100 @@ export default function Home() {
             reports={reports}
             getReportStatusClass={getReportStatusClass}
           />
+        </>
+      )}
+
+      {/* Блок профиля */}
+      {activeTab === 'profile' && profile && (
+        <>
+          <div className={styles.profileHeader}>
+            <h3 className={styles.profileTitle}>Профиль пользователя</h3>
+            <button 
+              onClick={handleRefreshData}
+              className={styles.refreshButtonLarge}
+              disabled={isLoading}
+            >
+              {isLoading ? '⏳ Обновление...' : '🔄 Обновить профиль'}
+            </button>
+          </div>
+          <div className={styles.profileCard}>
+            <div className={styles.profileSection}>
+              <h4 className={styles.profileSectionTitle}>Основная информация</h4>
+              <div className={styles.profileField}>
+                <span className={styles.fieldLabel}>ФИО:</span>
+                <span className={styles.fieldValue}>{profile.fullName}</span>
+              </div>
+              <div className={styles.profileField}>
+                <span className={styles.fieldLabel}>Институт/факультет:</span>
+                <span className={styles.fieldValue}>{profile.institute}</span>
+              </div>
+              <div className={styles.profileField}>
+                <span className={styles.fieldLabel}>Группа:</span>
+                <span className={styles.fieldValue}>{profile.group}</span>
+              </div>
+              <div className={styles.profileField}>
+                <span className={styles.fieldLabel}>Студенческий билет:</span>
+                <span className={styles.fieldValue}>{profile.studentId}</span>
+              </div>
+            </div>
+
+            <div className={styles.profileSection}>
+              <h4 className={styles.profileSectionTitle}>Образовательная информация</h4>
+              <div className={styles.profileField}>
+                <span className={styles.fieldLabel}>Специальность:</span>
+                <span className={styles.fieldValue}>{profile.specialty}</span>
+              </div>
+              <div className={styles.profileField}>
+                <span className={styles.fieldLabel}>Направленность:</span>
+                <span className={styles.fieldValue}>{profile.direction}</span>
+              </div>
+              <div className={styles.profileField}>
+                <span className={styles.fieldLabel}>Форма обучения:</span>
+                <span className={styles.fieldValue}>{profile.educationForm}</span>
+              </div>
+              <div className={styles.profileField}>
+                <span className={styles.fieldLabel}>Уровень образования:</span>
+                <span className={styles.fieldValue}>{profile.educationLevel}</span>
+              </div>
+              <div className={styles.profileField}>
+                <span className={styles.fieldLabel}>Статус:</span>
+                <span className={styles.fieldValue}>{profile.status}</span>
+              </div>
+            </div>
+
+            {profile.contacts && (
+              <div className={styles.profileSection}>
+                <h4 className={styles.profileSectionTitle}>Контактная информация</h4>
+                {profile.contacts.email && (
+                  <div className={styles.profileField}>
+                    <span className={styles.fieldLabel}>Email:</span>
+                    <span className={styles.fieldValue}>{profile.contacts.email}</span>
+                  </div>
+                )}
+                {profile.contacts.accountEmail && (
+                  <div className={styles.profileField}>
+                    <span className={styles.fieldLabel}>Почта аккаунта:</span>
+                    <span className={styles.fieldValue}>{profile.contacts.accountEmail}</span>
+                  </div>
+                )}
+                {profile.contacts.phone && (
+                  <div className={styles.profileField}>
+                    <span className={styles.fieldLabel}>Телефон:</span>
+                    <span className={styles.fieldValue}>{profile.contacts.phone}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {profile.currentCabinet && (
+              <div className={styles.profileSection}>
+                <h4 className={styles.profileSectionTitle}>Текущий личный кабинет</h4>
+                <div className={styles.profileField}>
+                  <span className={styles.fieldValue}>{profile.currentCabinet.label}</span>
+                </div>
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>

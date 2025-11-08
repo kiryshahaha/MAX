@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { scrapeGuapTasks, scrapeGuapReports } from './index.js';
+import { scrapeGuapTasks, scrapeGuapReports, scrapeGuapProfile } from './index.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -84,6 +84,30 @@ app.post('/api/scrape/reports', async (req, res) => {
     res.status(500).json({
       success: false,
       message: `❌ Ошибка парсера отчетов: ${error.message}`
+    });
+  }
+});
+
+app.post('/api/scrape/profile', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: '❌ Укажите логин и пароль'
+      });
+    }
+
+    console.log(`Запрос на парсинг профиля для пользователя: ${username}`);
+    const result = await scrapeGuapProfile({ username, password });
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Ошибка в API парсера профиля:', error);
+    res.status(500).json({
+      success: false,
+      message: `❌ Ошибка парсера профиля: ${error.message}`
     });
   }
 });
