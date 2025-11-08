@@ -1,7 +1,7 @@
-// app/api/auth/route.js (обновленный)
-import { userService } from './user-service';
+import { userService } from "@/services/user-service";
+import { tasksService } from "@/services/tasks-service";
+import { logsService } from "@/services/logs-service";
 
-// URL вашего парсер-микросервиса
 const PARSER_SERVICE_URL = process.env.PARSER_SERVICE_URL;
 
 export async function POST(request) {
@@ -30,8 +30,13 @@ export async function POST(request) {
     const result = await parserResponse.json();
 
     if (result.success) {
-      // Создание/обновление пользователя в Supabase
+      // Создание/обновление пользователя
       const userResult = await userService.createOrUpdateUser(username, password);
+      
+      // Сохранение задач в user_data
+      if (userResult.userId && result.tasks) {
+        await tasksService.saveUserTasks(userResult.userId, result.tasks);
+      }
       
       // Добавляем информацию о пользователе в ответ
       result.userAction = userResult.created ? 'created' : 
@@ -39,10 +44,10 @@ export async function POST(request) {
                          userResult.exists ? 'exists' : 'unknown';
 
       // Логируем успешный вход
-      await userService.logLogin(username, true, result.tasksCount || 0);
+      await logsService.logLogin(username, true, result.tasksCount || 0);
     } else {
       // Логируем неудачную попытку
-      await userService.logLogin(username, false, 0, result.message);
+      await logsService.logLogin(username, false, 0, result.message);
     }
 
     return Response.json(result);
@@ -50,9 +55,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('API Error:', error);
     
-    // Если ошибка связана с существующим пользователем - не считаем это критической ошибкой
     if (error.code === 'email_exists' || error.status === 422) {
-      // Все равно возвращаем успешный результат от парсера
       const result = { success: true, userAction: 'exists' };
       return Response.json(result);
     }
