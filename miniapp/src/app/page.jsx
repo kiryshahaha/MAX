@@ -13,8 +13,13 @@ export default function Home() {
   const [tasks, setTasks] = useState([]);
   const [reports, setReports] = useState([]);
   const [profile, setProfile] = useState(null);
+  const [schedule, setSchedule] = useState(null);
   const [activeTab, setActiveTab] = useState('tasks');
   const [isLoading, setIsLoading] = useState(false);
+  const [scheduleParams, setScheduleParams] = useState({
+    year: 2025,
+    week: 44
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,14 +32,28 @@ export default function Home() {
     setStatus('⏳ Выполняется вход и получение данных...');
 
     try {
-      const endpoint = activeTab === 'tasks' ? '/api/post-tasks' : 
-                      activeTab === 'reports' ? '/api/post-reports' : 
-                      '/api/post-profile';
-      
+      let endpoint;
+      let body;
+
+      if (activeTab === 'schedule') {
+        endpoint = '/api/post-schedule';
+        body = JSON.stringify({
+          username,
+          password,
+          year: scheduleParams.year,
+          week: scheduleParams.week
+        });
+      } else {
+        endpoint = activeTab === 'tasks' ? '/api/post-tasks' :
+          activeTab === 'reports' ? '/api/post-reports' :
+            '/api/post-profile';
+        body = JSON.stringify({ username, password });
+      }
+
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: body,
       });
 
       if (!res.ok) {
@@ -42,7 +61,7 @@ export default function Home() {
       }
 
       const data = await res.json();
-      
+
       if (data.success) {
         if (activeTab === 'tasks' && data.tasks) {
           setTasks(data.tasks);
@@ -53,6 +72,10 @@ export default function Home() {
         } else if (activeTab === 'profile' && data.profile) {
           setProfile(data.profile);
           setStatus(`✅ Профиль успешно получен`);
+        } else if (activeTab === 'schedule' && data.schedule) {
+          setSchedule(data.schedule);
+          const totalClasses = (data.schedule.regularClasses?.length || 0) + (data.schedule.extraClasses?.length || 0);
+          setStatus(`✅ Расписание получено (${totalClasses} занятий)`);
         } else {
           setStatus(data.message || 'Данные успешно получены');
         }
@@ -77,14 +100,28 @@ export default function Home() {
     setStatus('⏳ Обновляем данные...');
 
     try {
-      const endpoint = activeTab === 'tasks' ? '/api/post-tasks' : 
-                      activeTab === 'reports' ? '/api/post-reports' : 
-                      '/api/post-profile';
-      
+      let endpoint;
+      let body;
+
+      if (activeTab === 'schedule') {
+        endpoint = '/api/post-schedule';
+        body = JSON.stringify({
+          username,
+          password,
+          year: scheduleParams.year,
+          week: scheduleParams.week
+        });
+      } else {
+        endpoint = activeTab === 'tasks' ? '/api/post-tasks' :
+          activeTab === 'reports' ? '/api/post-reports' :
+            '/api/post-profile';
+        body = JSON.stringify({ username, password });
+      }
+
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: body,
       });
 
       if (!res.ok) {
@@ -92,7 +129,7 @@ export default function Home() {
       }
 
       const data = await res.json();
-      
+
       if (data.success) {
         if (activeTab === 'tasks' && data.tasks) {
           setTasks(data.tasks);
@@ -103,6 +140,10 @@ export default function Home() {
         } else if (activeTab === 'profile' && data.profile) {
           setProfile(data.profile);
           setStatus(`✅ Профиль успешно обновлен`);
+        } else if (activeTab === 'schedule' && data.schedule) {
+          setSchedule(data.schedule);
+          const totalClasses = (data.schedule.regularClasses?.length || 0) + (data.schedule.extraClasses?.length || 0);
+          setStatus(`✅ Расписание обновлено (${totalClasses} занятий)`);
         } else {
           setStatus(data.message || 'Данные успешно обновлены');
         }
@@ -115,6 +156,13 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleScheduleParamChange = (param, value) => {
+    setScheduleParams(prev => ({
+      ...prev,
+      [param]: value
+    }));
   };
 
   const getStatusClass = () => {
@@ -144,10 +192,25 @@ export default function Home() {
     return styles.deadlineDefault;
   };
 
+  const getScheduleTypeClass = (type) => {
+    switch (type) {
+      case 'Л': return styles.scheduleLecture;
+      case 'Пр': return styles.schedulePractice;
+      case 'ЛР': return styles.scheduleLab;
+      case 'КР': return styles.scheduleCourse;
+      default: return styles.scheduleDefault;
+    }
+  };
+
+  const getTotalClassesCount = () => {
+    if (!schedule) return 0;
+    return (schedule.regularClasses?.length || 0) + (schedule.extraClasses?.length || 0);
+  };
+
   return (
     <div className={styles.container}>
       <h1 className={styles.title}>Вход в ЛК ГУАП</h1>
-      
+
       <form onSubmit={handleSubmit} className={styles.form}>
         <input
           type="text"
@@ -165,8 +228,37 @@ export default function Home() {
           required
           className={styles.input}
         />
-        <button 
-          type="submit" 
+
+        {/* Параметры расписания (только для вкладки расписания) */}
+        {activeTab === 'schedule' && (
+          <div className={styles.scheduleParams}>
+            <div className={styles.paramGroup}>
+              <label className={styles.paramLabel}>Год:</label>
+              <input
+                type="number"
+                value={scheduleParams.year}
+                onChange={(e) => handleScheduleParamChange('year', parseInt(e.target.value))}
+                className={styles.paramInput}
+                min="2024"
+                max="2030"
+              />
+            </div>
+            <div className={styles.paramGroup}>
+              <label className={styles.paramLabel}>Неделя:</label>
+              <input
+                type="number"
+                value={scheduleParams.week}
+                onChange={(e) => handleScheduleParamChange('week', parseInt(e.target.value))}
+                className={styles.paramInput}
+                min="1"
+                max="52"
+              />
+            </div>
+          </div>
+        )}
+
+        <button
+          type="submit"
           className={styles.button}
           disabled={isLoading}
         >
@@ -174,33 +266,39 @@ export default function Home() {
         </button>
       </form>
 
-      {/* Табы для переключения между задачами, отчетами и профилем */}
+      {/* Табы для переключения между задачами, отчетами, профилем и расписанием */}
       <div className={styles.tabs}>
-        <button 
+        <button
           className={`${styles.tab} ${activeTab === 'tasks' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('tasks')}
         >
           Задания ({tasks.length})
         </button>
-        <button 
+        <button
           className={`${styles.tab} ${activeTab === 'reports' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('reports')}
         >
           Отчеты ({reports.length})
         </button>
-        <button 
+        <button
           className={`${styles.tab} ${activeTab === 'profile' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('profile')}
         >
           Профиль ({profile ? '✓' : '0'})
         </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'schedule' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('schedule')}
+        >
+          Расписание ({getTotalClassesCount()})
+        </button>
       </div>
-      
+
       {status && (
         <div className={`${styles.status} ${getStatusClass()}`}>
           {status}
-          {(tasks.length > 0 || reports.length > 0 || profile) && (
-            <button 
+          {(tasks.length > 0 || reports.length > 0 || profile || schedule) && (
+            <button
               onClick={handleRefreshData}
               className={styles.refreshButton}
               disabled={isLoading}
@@ -216,7 +314,7 @@ export default function Home() {
         <>
           <div className={styles.tasksHeader}>
             <h3 className={styles.tasksTitle}>Найдено заданий: {tasks.length}</h3>
-            <button 
+            <button
               onClick={handleRefreshData}
               className={styles.refreshButtonLarge}
               disabled={isLoading}
@@ -224,7 +322,7 @@ export default function Home() {
               {isLoading ? '⏳ Обновление...' : '🔄 Обновить задачи'}
             </button>
           </div>
-          <TasksTable 
+          <TasksTable
             tasks={tasks}
             getTaskStatusClass={getTaskStatusClass}
             getDeadlineClass={getDeadlineClass}
@@ -237,7 +335,7 @@ export default function Home() {
         <>
           <div className={styles.reportsHeader}>
             <h3 className={styles.reportsTitle}>Найдено отчетов: {reports.length}</h3>
-            <button 
+            <button
               onClick={handleRefreshData}
               className={styles.refreshButtonLarge}
               disabled={isLoading}
@@ -245,7 +343,7 @@ export default function Home() {
               {isLoading ? '⏳ Обновление...' : '🔄 Обновить отчеты'}
             </button>
           </div>
-          <ReportsTable 
+          <ReportsTable
             reports={reports}
             getReportStatusClass={getReportStatusClass}
           />
@@ -257,7 +355,7 @@ export default function Home() {
         <>
           <div className={styles.profileHeader}>
             <h3 className={styles.profileTitle}>Профиль пользователя</h3>
-            <button 
+            <button
               onClick={handleRefreshData}
               className={styles.refreshButtonLarge}
               disabled={isLoading}
@@ -343,6 +441,130 @@ export default function Home() {
               </div>
             )}
           </div>
+        </>
+      )}
+
+      {/* Блок расписания */}
+      {activeTab === 'schedule' && schedule && (
+        <>
+          <div className={styles.scheduleHeader}>
+            <div className={styles.scheduleInfo}>
+              <h3 className={styles.scheduleTitle}>
+                Расписание на {scheduleParams.year} год, неделя {scheduleParams.week}
+              </h3>
+              <div className={styles.scheduleStats}>
+                Регулярных занятий: {schedule.regularClasses?.length || 0} |
+                Вне сетки: {schedule.extraClasses?.length || 0}
+              </div>
+            </div>
+            <button
+              onClick={handleRefreshData}
+              className={styles.refreshButtonLarge}
+              disabled={isLoading}
+            >
+              {isLoading ? '⏳ Обновление...' : '🔄 Обновить расписание'}
+            </button>
+          </div>
+
+          {schedule.days && schedule.days.length > 0 && (
+  <div className={styles.scheduleSection}>
+    <h4 className={styles.scheduleSectionTitle}>Основное расписание</h4>
+    <div className={styles.scheduleTable}>
+      {schedule.days.map((day, dayIndex) => (
+        <div key={dayIndex}>
+          {/* Заголовок дня */}
+          <div className={styles.dayHeader}>
+            <h5 className={styles.dayTitle}>
+              {day.dayName} - {day.date}
+              {day.fullDate && (
+                <span className={styles.fullDate}>({day.fullDate})</span>
+              )}
+            </h5>
+            <span className={styles.dayClassesCount}>
+              {day.classes.length} занятий
+            </span>
+          </div>
+          
+          {/* Занятия дня */}
+          {day.classes.map((classItem, classIndex) => (
+            <div key={classIndex} className={styles.scheduleItem}>
+              <div className={styles.classHeader}>
+                <span className={`${styles.classType} ${getScheduleTypeClass(classItem.type)}`}>
+                  {classItem.type}
+                </span>
+                <span className={styles.classTime}>
+                  {classItem.pairNumber} пара ({classItem.timeRange})
+                </span>
+              </div>
+              <div className={styles.classBody}>
+                <div className={styles.classSubject}>{classItem.subject}</div>
+                {classItem.teacher && (
+                  <div className={styles.classTeacher}>
+                    <span className={styles.teacherIcon}>👤</span>
+                    {classItem.teacher}
+                    {classItem.teacherInfo && (
+                      <span className={styles.teacherInfo}> ({classItem.teacherInfo})</span>
+                    )}
+                  </div>
+                )}
+                {classItem.location && (
+                  <div className={styles.classLocation}>
+                    <span className={styles.locationIcon}>📍</span>
+                    {classItem.location}
+                  </div>
+                )}
+                {classItem.group && (
+                  <div className={styles.classGroup}>
+                    Группа: {classItem.group}
+                  </div>
+                )}
+                {/* Форматированный текст */}
+                <div className={styles.formattedText}>
+                  {classItem.formattedText}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+          {/* Занятия вне сетки */}
+          {schedule.extraClasses && schedule.extraClasses.length > 0 && (
+            <div className={styles.scheduleSection}>
+              <h4 className={styles.scheduleSectionTitle}>Занятия вне сетки расписания</h4>
+              <div className={styles.scheduleTable}>
+                {schedule.extraClasses.map((classItem, index) => (
+                  <div key={index} className={styles.scheduleItem}>
+                    <div className={styles.classHeader}>
+                      <span className={`${styles.classType} ${getScheduleTypeClass(classItem.type)}`}>
+                        {classItem.type}
+                      </span>
+                    </div>
+                    <div className={styles.classBody}>
+                      <div className={styles.classSubject}>{classItem.subject}</div>
+                      {classItem.teacher && (
+                        <div className={styles.classTeacher}>
+                          <span className={styles.teacherIcon}>👤</span>
+                          {classItem.teacher}
+                          {classItem.teacherInfo && (
+                            <span className={styles.teacherInfo}> ({classItem.teacherInfo})</span>
+                          )}
+                        </div>
+                      )}
+                      {classItem.group && (
+                        <div className={styles.classGroup}>
+                          Группа: {classItem.group}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
