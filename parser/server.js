@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { scrapeGuapTasks, scrapeGuapReports, scrapeGuapProfile, scrapeGuapSchedule } from './index.js';
+import { scrapeGuapTasks, scrapeGuapReports, scrapeGuapProfile } from './index.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -11,7 +11,7 @@ app.use(express.json());
 // Универсальный эндпоинт для парсинга
 app.post('/api/scrape', async (req, res) => {
   try {
-    const { username, password, type = 'tasks', year, week } = req.body;
+    const { username, password, type = 'tasks' } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({
@@ -25,8 +25,6 @@ app.post('/api/scrape', async (req, res) => {
     let result;
     if (type === 'reports') {
       result = await scrapeGuapReports({ username, password });
-    } else if (type === 'schedule') {
-      result = await scrapeGuapSchedule({ username, password }, year, week);
     } else {
       result = await scrapeGuapTasks({ username, password });
     }
@@ -41,7 +39,78 @@ app.post('/api/scrape', async (req, res) => {
   }
 });
 
-// Существующие эндпоинты остаются...
+// Отдельные эндпоинты для обратной совместимости
+app.post('/api/scrape/tasks', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: '❌ Укажите логин и пароль'
+      });
+    }
+
+    console.log(`Запрос на парсинг задач для пользователя: ${username}`);
+    const result = await scrapeGuapTasks({ username, password });
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Ошибка в API парсера задач:', error);
+    res.status(500).json({
+      success: false,
+      message: `❌ Ошибка парсера задач: ${error.message}`
+    });
+  }
+});
+
+app.post('/api/scrape/reports', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: '❌ Укажите логин и пароль'
+      });
+    }
+
+    console.log(`Запрос на парсинг отчетов для пользователя: ${username}`);
+    const result = await scrapeGuapReports({ username, password });
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Ошибка в API парсера отчетов:', error);
+    res.status(500).json({
+      success: false,
+      message: `❌ Ошибка парсера отчетов: ${error.message}`
+    });
+  }
+});
+
+app.post('/api/scrape/profile', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: '❌ Укажите логин и пароль'
+      });
+    }
+
+    console.log(`Запрос на парсинг профиля для пользователя: ${username}`);
+    const result = await scrapeGuapProfile({ username, password });
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Ошибка в API парсера профиля:', error);
+    res.status(500).json({
+      success: false,
+      message: `❌ Ошибка парсера профиля: ${error.message}`
+    });
+  }
+});
 
 // Новый эндпоинт для расписания
 app.post('/api/scrape/schedule', async (req, res) => {
@@ -68,7 +137,6 @@ app.post('/api/scrape/schedule', async (req, res) => {
   }
 });
 
-// Остальные существующие эндпоинты...
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', service: 'GUAP Parser' });
 });
