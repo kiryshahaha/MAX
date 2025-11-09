@@ -12,6 +12,7 @@ export default function Home() {
   const [status, setStatus] = useState('');
   const [tasks, setTasks] = useState([]);
   const [reports, setReports] = useState([]);
+  const [marks, setMarks] = useState([]);
   const [profile, setProfile] = useState(null);
   const [schedule, setSchedule] = useState(null);
   const [activeTab, setActiveTab] = useState('tasks');
@@ -19,6 +20,12 @@ export default function Home() {
   const [scheduleParams, setScheduleParams] = useState({
     year: 2025,
     week: 44
+  });
+  const [marksParams, setMarksParams] = useState({
+    semester: '3',
+    contrType: '0',
+    teacher: '0',
+    mark: '0'
   });
 
   const handleSubmit = async (e) => {
@@ -42,6 +49,16 @@ export default function Home() {
           password,
           year: scheduleParams.year,
           week: scheduleParams.week
+        });
+      } else if (activeTab === 'marks') {
+        endpoint = '/api/post-marks';
+        body = JSON.stringify({
+          username,
+          password,
+          semester: marksParams.semester,
+          contrType: marksParams.contrType,
+          teacher: marksParams.teacher,
+          mark: marksParams.mark
         });
       } else {
         endpoint = activeTab === 'tasks' ? '/api/post-tasks' :
@@ -69,6 +86,9 @@ export default function Home() {
         } else if (activeTab === 'reports' && data.reports) {
           setReports(data.reports);
           setStatus(`✅ Получено ${data.reports.length} отчетов`);
+        } else if (activeTab === 'marks' && data.marks) {
+          setMarks(data.marks);
+          setStatus(`✅ Получено ${data.marks.length} оценок`);
         } else if (activeTab === 'profile' && data.profile) {
           setProfile(data.profile);
           setStatus(`✅ Профиль успешно получен`);
@@ -111,6 +131,16 @@ export default function Home() {
           year: scheduleParams.year,
           week: scheduleParams.week
         });
+      } else if (activeTab === 'marks') {
+        endpoint = '/api/post-marks';
+        body = JSON.stringify({
+          username,
+          password,
+          semester: marksParams.semester,
+          contrType: marksParams.contrType,
+          teacher: marksParams.teacher,
+          mark: marksParams.mark
+        });
       } else {
         endpoint = activeTab === 'tasks' ? '/api/post-tasks' :
           activeTab === 'reports' ? '/api/post-reports' :
@@ -137,6 +167,9 @@ export default function Home() {
         } else if (activeTab === 'reports' && data.reports) {
           setReports(data.reports);
           setStatus(`✅ Обновлено ${data.reports.length} отчетов`);
+        } else if (activeTab === 'marks' && data.marks) {
+          setMarks(data.marks);
+          setStatus(`✅ Обновлено ${data.marks.length} оценок`);
         } else if (activeTab === 'profile' && data.profile) {
           setProfile(data.profile);
           setStatus(`✅ Профиль успешно обновлен`);
@@ -160,6 +193,13 @@ export default function Home() {
 
   const handleScheduleParamChange = (param, value) => {
     setScheduleParams(prev => ({
+      ...prev,
+      [param]: value
+    }));
+  };
+
+  const handleMarksParamChange = (param, value) => {
+    setMarksParams(prev => ({
       ...prev,
       [param]: value
     }));
@@ -202,9 +242,28 @@ export default function Home() {
     }
   };
 
+  const getMarkColor = (markValue) => {
+    const markColors = {
+      'н/я': '#6B7280',
+      'неудовл.': '#EF4444',
+      'удовл.': '#F59E0B',
+      'хорошо': '#10B981',
+      'отлично': '#059669',
+      'незачет': '#EF4444',
+      'зачет': '#10B981',
+      'освобождение': '#3B82F6',
+      'нет': '#6B7280'
+    };
+    return markColors[markValue] || '#6B7280';
+  };
+
   const getTotalClassesCount = () => {
     if (!schedule) return 0;
     return (schedule.regularClasses?.length || 0) + (schedule.extraClasses?.length || 0);
+  };
+
+  const getTotalCredits = () => {
+    return marks.reduce((total, mark) => total + (mark.creditsValue || 0), 0);
   };
 
   return (
@@ -257,6 +316,62 @@ export default function Home() {
           </div>
         )}
 
+        {/* Параметры оценок (только для вкладки оценок) */}
+        {activeTab === 'marks' && (
+          <div className={styles.marksParams}>
+            <div className={styles.paramGroup}>
+              <label className={styles.paramLabel}>Семестр:</label>
+              <select
+                value={marksParams.semester}
+                onChange={(e) => handleMarksParamChange('semester', e.target.value)}
+                className={styles.paramSelect}
+              >
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+              </select>
+            </div>
+            <div className={styles.paramGroup}>
+              <label className={styles.paramLabel}>Тип контроля:</label>
+              <select
+                value={marksParams.contrType}
+                onChange={(e) => handleMarksParamChange('contrType', e.target.value)}
+                className={styles.paramSelect}
+              >
+                <option value="0">Все</option>
+                <option value="1">Экзамен</option>
+                <option value="2">Зачет</option>
+                <option value="3">Курсовая работа</option>
+                <option value="4">Курсовой проект</option>
+                <option value="6">Дифференцированный зачет</option>
+                <option value="7">Канд. экзамен</option>
+              </select>
+            </div>
+            <div className={styles.paramGroup}>
+              <label className={styles.paramLabel}>Оценка:</label>
+              <select
+                value={marksParams.mark}
+                onChange={(e) => handleMarksParamChange('mark', e.target.value)}
+                className={styles.paramSelect}
+              >
+                <option value="0">Все</option>
+                <option value="1">н/я</option>
+                <option value="2">неудовл.</option>
+                <option value="3">удовл.</option>
+                <option value="4">хорошо</option>
+                <option value="5">отлично</option>
+                <option value="6">незачет</option>
+                <option value="7">зачет</option>
+              </select>
+            </div>
+          </div>
+        )}
+
         <button
           type="submit"
           className={styles.button}
@@ -266,7 +381,7 @@ export default function Home() {
         </button>
       </form>
 
-      {/* Табы для переключения между задачами, отчетами, профилем и расписанием */}
+      {/* Табы для переключения между задачами, отчетами, оценками, профилем и расписанием */}
       <div className={styles.tabs}>
         <button
           className={`${styles.tab} ${activeTab === 'tasks' ? styles.tabActive : ''}`}
@@ -279,6 +394,12 @@ export default function Home() {
           onClick={() => setActiveTab('reports')}
         >
           Отчеты ({reports.length})
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'marks' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('marks')}
+        >
+          Оценки ({marks.length})
         </button>
         <button
           className={`${styles.tab} ${activeTab === 'profile' ? styles.tabActive : ''}`}
@@ -297,7 +418,7 @@ export default function Home() {
       {status && (
         <div className={`${styles.status} ${getStatusClass()}`}>
           {status}
-          {(tasks.length > 0 || reports.length > 0 || profile || schedule) && (
+          {(tasks.length > 0 || reports.length > 0 || marks.length > 0 || profile || schedule) && (
             <button
               onClick={handleRefreshData}
               className={styles.refreshButton}
@@ -347,6 +468,78 @@ export default function Home() {
             reports={reports}
             getReportStatusClass={getReportStatusClass}
           />
+        </>
+      )}
+
+      {/* Блок оценок */}
+      {activeTab === 'marks' && marks.length > 0 && (
+        <>
+          <div className={styles.marksHeader}>
+            <div className={styles.marksInfo}>
+              <h3 className={styles.marksTitle}>
+                Оценки за {marksParams.semester} семестр
+              </h3>
+              <div className={styles.marksStats}>
+                Предметов: {marks.length} | Зачетных единиц: {getTotalCredits()}
+              </div>
+            </div>
+            <button
+              onClick={handleRefreshData}
+              className={styles.refreshButtonLarge}
+              disabled={isLoading}
+            >
+              {isLoading ? '⏳ Обновление...' : '🔄 Обновить оценки'}
+            </button>
+          </div>
+          <div className={styles.marksGrid}>
+            {marks.map((mark, index) => (
+              <div key={index} className={styles.markCard}>
+                <div className={styles.markHeader}>
+                  <h4 className={styles.markSubject}>
+                    <a 
+                      href={`https://pro.guap.ru${mark.subject.url}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className={styles.markLink}
+                    >
+                      {mark.subject.name}
+                    </a>
+                  </h4>
+                  <div 
+                    className={styles.markBadge}
+                    style={{ backgroundColor: getMarkColor(mark.mark.value) }}
+                  >
+                    {mark.mark.value}
+                  </div>
+                </div>
+                
+                <div className={styles.markDetails}>
+                  <div className={styles.markDetail}>
+                    <span className={styles.detailLabel}>Тип контроля:</span>
+                    <span className={styles.detailValue}>{mark.controlType}</span>
+                  </div>
+                  
+                  <div className={styles.markDetail}>
+                    <span className={styles.detailLabel}>Преподаватели:</span>
+                    <div className={styles.teachersList}>
+                      {mark.teachers.map((teacher, teacherIndex) => (
+                        <span key={teacherIndex} className={styles.teacher}>
+                          {teacher.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {mark.credits && (
+                    <div className={styles.markDetail}>
+                      <span className={styles.detailLabel}>Зачетные единицы:</span>
+                      <span className={styles.credits}>{mark.credits}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </>
       )}
 
@@ -467,69 +660,69 @@ export default function Home() {
           </div>
 
           {schedule.days && schedule.days.length > 0 && (
-  <div className={styles.scheduleSection}>
-    <h4 className={styles.scheduleSectionTitle}>Основное расписание</h4>
-    <div className={styles.scheduleTable}>
-      {schedule.days.map((day, dayIndex) => (
-        <div key={dayIndex}>
-          {/* Заголовок дня */}
-          <div className={styles.dayHeader}>
-            <h5 className={styles.dayTitle}>
-              {day.dayName} - {day.date}
-              {day.fullDate && (
-                <span className={styles.fullDate}>({day.fullDate})</span>
-              )}
-            </h5>
-            <span className={styles.dayClassesCount}>
-              {day.classes.length} занятий
-            </span>
-          </div>
-          
-          {/* Занятия дня */}
-          {day.classes.map((classItem, classIndex) => (
-            <div key={classIndex} className={styles.scheduleItem}>
-              <div className={styles.classHeader}>
-                <span className={`${styles.classType} ${getScheduleTypeClass(classItem.type)}`}>
-                  {classItem.type}
-                </span>
-                <span className={styles.classTime}>
-                  {classItem.pairNumber} пара ({classItem.timeRange})
-                </span>
-              </div>
-              <div className={styles.classBody}>
-                <div className={styles.classSubject}>{classItem.subject}</div>
-                {classItem.teacher && (
-                  <div className={styles.classTeacher}>
-                    <span className={styles.teacherIcon}>👤</span>
-                    {classItem.teacher}
-                    {classItem.teacherInfo && (
-                      <span className={styles.teacherInfo}> ({classItem.teacherInfo})</span>
-                    )}
+            <div className={styles.scheduleSection}>
+              <h4 className={styles.scheduleSectionTitle}>Основное расписание</h4>
+              <div className={styles.scheduleTable}>
+                {schedule.days.map((day, dayIndex) => (
+                  <div key={dayIndex}>
+                    {/* Заголовок дня */}
+                    <div className={styles.dayHeader}>
+                      <h5 className={styles.dayTitle}>
+                        {day.dayName} - {day.date}
+                        {day.fullDate && (
+                          <span className={styles.fullDate}>({day.fullDate})</span>
+                        )}
+                      </h5>
+                      <span className={styles.dayClassesCount}>
+                        {day.classes.length} занятий
+                      </span>
+                    </div>
+                    
+                    {/* Занятия дня */}
+                    {day.classes.map((classItem, classIndex) => (
+                      <div key={classIndex} className={styles.scheduleItem}>
+                        <div className={styles.classHeader}>
+                          <span className={`${styles.classType} ${getScheduleTypeClass(classItem.type)}`}>
+                            {classItem.type}
+                          </span>
+                          <span className={styles.classTime}>
+                            {classItem.pairNumber} пара ({classItem.timeRange})
+                          </span>
+                        </div>
+                        <div className={styles.classBody}>
+                          <div className={styles.classSubject}>{classItem.subject}</div>
+                          {classItem.teacher && (
+                            <div className={styles.classTeacher}>
+                              <span className={styles.teacherIcon}>👤</span>
+                              {classItem.teacher}
+                              {classItem.teacherInfo && (
+                                <span className={styles.teacherInfo}> ({classItem.teacherInfo})</span>
+                              )}
+                            </div>
+                          )}
+                          {classItem.location && (
+                            <div className={styles.classLocation}>
+                              <span className={styles.locationIcon}>📍</span>
+                              {classItem.location}
+                            </div>
+                          )}
+                          {classItem.group && (
+                            <div className={styles.classGroup}>
+                              Группа: {classItem.group}
+                            </div>
+                          )}
+                          {/* Форматированный текст */}
+                          <div className={styles.formattedText}>
+                            {classItem.formattedText}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                )}
-                {classItem.location && (
-                  <div className={styles.classLocation}>
-                    <span className={styles.locationIcon}>📍</span>
-                    {classItem.location}
-                  </div>
-                )}
-                {classItem.group && (
-                  <div className={styles.classGroup}>
-                    Группа: {classItem.group}
-                  </div>
-                )}
-                {/* Форматированный текст */}
-                <div className={styles.formattedText}>
-                  {classItem.formattedText}
-                </div>
+                ))}
               </div>
             </div>
-          ))}
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+          )}
 
           {/* Занятия вне сетки */}
           {schedule.extraClasses && schedule.extraClasses.length > 0 && (

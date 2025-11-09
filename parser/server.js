@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { scrapeGuapTasks, scrapeGuapReports, scrapeGuapProfile, scrapeGuapSchedule } from './index.js';
+import { scrapeGuapTasks, scrapeGuapReports, scrapeGuapProfile, scrapeGuapSchedule, scrapeGuapMarks } from './index.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -133,6 +133,30 @@ app.post('/api/scrape/schedule', async (req, res) => {
     res.status(500).json({
       success: false,
       message: `❌ Ошибка парсера расписания: ${error.message}`
+    });
+  }
+});
+
+app.post('/api/scrape/marks', async (req, res) => {
+  try {
+    const { username, password, semester = null, contrType = 0, teacher = 0, mark = 0 } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: '❌ Укажите логин и пароль'
+      });
+    }
+
+    console.log(`Запрос на парсинг оценок для пользователя: ${username}, семестр: ${semester}`);
+    const result = await scrapeGuapMarks({ username, password }, semester, contrType, teacher, mark);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Ошибка в API парсера оценок:', error);
+    res.status(500).json({
+      success: false,
+      message: `❌ Ошибка парсера оценок: ${error.message}`
     });
   }
 });

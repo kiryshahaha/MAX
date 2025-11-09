@@ -464,6 +464,229 @@
   color: #4a5568;
 }
 
+/* page.module.css (дополнения для оценок) */
+
+/* Параметры оценок */
+.marksParams {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 15px;
+  padding: 15px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+}
+
+.paramSelect {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  min-width: 150px;
+}
+
+.paramSelect:focus {
+  outline: none;
+  border-color: #0070f3;
+}
+
+/* Заголовок оценок */
+.marksHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.marksInfo {
+  flex: 1;
+}
+
+.marksTitle {
+  color: #1a365d;
+  margin: 0 0 8px 0;
+  font-weight: 600;
+}
+
+.marksStats {
+  color: #718096;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Сетка оценок */
+.marksGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+/* Карточка оценки */
+.markCard {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+  padding: 20px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.markCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Заголовок карточки оценки */
+.markHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 15px;
+  gap: 10px;
+}
+
+.markSubject {
+  color: #1a365d;
+  margin: 0;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.markLink {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.markLink:hover {
+  color: #0070f3;
+}
+
+/* Бейдж оценки */
+.markBadge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 60px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* Детали оценки */
+.markDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.markDetail {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.detailLabel {
+  font-weight: 600;
+  color: #4a5568;
+  min-width: 120px;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.detailValue {
+  color: #2d3748;
+  flex: 1;
+  font-size: 14px;
+}
+
+/* Список преподавателей */
+.teachersList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.teacher {
+  color: #4a5568;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+/* Зачетные единицы */
+.credits {
+  background: #10B981;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+  .marksParams {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .paramGroup {
+    justify-content: space-between;
+    width: 100%;
+  }
+  
+  .paramSelect {
+    min-width: 100%;
+  }
+  
+  .marksHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .marksGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .markHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .markBadge {
+    align-self: flex-start;
+  }
+  
+  .markDetail {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+  }
+  
+  .detailLabel {
+    min-width: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .marksGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .markCard {
+    padding: 15px;
+  }
+}
+
 /* Адаптивность */
 @media (max-width: 768px) {
   .dayHeader {
