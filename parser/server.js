@@ -1,12 +1,61 @@
 import express from 'express';
 import cors from 'cors';
 import { scrapeGuapTasks, scrapeGuapReports, scrapeGuapProfile, scrapeGuapSchedule, scrapeGuapMarks } from './index.js';
+import { SessionManager } from './core/session-manager.js';
+
+setInterval(() => {
+  SessionManager.cleanupExpiredSessions();
+}, 5 * 60 * 1000); // Каждые 5 минут
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('🛑 Received SIGINT. Cleaning up sessions...');
+  await SessionManager.cleanupAllSessions();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('🛑 Received SIGTERM. Cleaning up sessions...');
+  await SessionManager.cleanupAllSessions();
+  process.exit(0);
+});
+
+app.post('/api/logout', async (req, res) => {
+  try {
+    const { username } = req.body;
+    const userId = username; // или другой идентификатор
+    
+    const session = SessionManager.sessions.get(userId);
+    if (session) {
+      await session.page.close();
+      SessionManager.sessions.delete(userId);
+    }
+    
+    res.json({ success: true, message: '✅ Сессия завершена' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+app.get('/api/sessions', (req, res) => {
+  const sessionsInfo = Array.from(SessionManager.sessions.entries()).map(([userId, session]) => ({
+    userId,
+    createdAt: new Date(session.createdAt).toISOString(),
+    lastActivity: new Date(session.lastActivity).toISOString(),
+    age: Date.now() - session.createdAt
+  }));
+  
+  res.json({
+    activeSessions: SessionManager.sessions.size,
+    sessions: sessionsInfo
+  });
+});
 
 // Универсальный эндпоинт для парсинга
 app.post('/api/scrape', async (req, res) => {
@@ -51,7 +100,7 @@ app.post('/api/scrape/tasks', async (req, res) => {
       });
     }
 
-    console.log(`Запрос на парсинг задач для пользователя: ${username}`);
+    console.log(`Запрос задач для пользователя: ${username}`);
     const result = await scrapeGuapTasks({ username, password });
     
     res.json(result);

@@ -8,29 +8,16 @@ export class GuapTasksScraper extends BaseScraper {
     this.authStrategy = GuapAuthStrategy;
   }
 
-  async scrapeTasks(credentials) {
-    let browser;
+   async scrapeTasks(credentials) {
+    let page;
+    
     try {
-      browser = await this.browserManager.launch();
-      const page = await this.browserManager.createPage(browser);
-
-      // Аутентификация
-      const finalUrl = await this.authStrategy.login(page, credentials);
+      await this.validateCredentials(credentials);
       
-      if (!this.authStrategy.isLoginSuccessful(finalUrl)) {
-        // Проверяем наличие ошибки авторизации
-        const errorText = await page.evaluate(() => {
-          const errorElement = document.querySelector('.alert-error');
-          return errorElement ? errorElement.textContent.trim() : null;
-        });
-        
-        if (errorText) {
-          throw new Error(errorText);
-        }
-        throw new Error('Неверный логин или пароль');
-      }
-
-      // Переход к задачам
+      // Используем существующую сессию или создаем новую
+      page = await this.getAuthenticatedPage(credentials);
+      
+      // Переход к задачам (уже аутентифицированы)
       await this.navigateToTasks(page);
       
       // Получаем общее количество задач
@@ -49,15 +36,25 @@ export class GuapTasksScraper extends BaseScraper {
       };
 
     } catch (error) {
-      throw error;
-    } finally {
-      if (browser) {
-        await browser.close();
+      // При ошибке инвалидируем сессию
+      if (page) {
+        await this.invalidateSession(credentials);
       }
+      throw error;
+    }
+    // Не закрываем страницу - она остается в сессии для повторного использования
+  }
+
+    async invalidateSession(credentials) {
+    const userId = this.getUserId(credentials);
+    const session = this.sessionManager.sessions.get(userId);
+    if (session) {
+      await session.page.close();
+      this.sessionManager.sessions.delete(userId);
     }
   }
 
-  async navigateToTasks(page) {
+async navigateToTasks(page) {
     console.log('Переходим на страницу заданий...');
     await page.goto('https://pro.guap.ru/inside/student/tasks/', { 
       waitUntil: 'networkidle2', 

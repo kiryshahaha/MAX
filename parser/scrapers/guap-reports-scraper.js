@@ -9,26 +9,11 @@ export class GuapReportsScraper extends BaseScraper {
   }
 
   async scrapeReports(credentials) {
-    let browser;
+    let page;
+    
     try {
-      browser = await this.browserManager.launch();
-      const page = await this.browserManager.createPage(browser);
-
-      // Аутентификация
-      const finalUrl = await this.authStrategy.login(page, credentials);
-      
-      if (!this.authStrategy.isLoginSuccessful(finalUrl)) {
-        // Проверяем наличие ошибки авторизации
-        const errorText = await page.evaluate(() => {
-          const errorElement = document.querySelector('.alert-error');
-          return errorElement ? errorElement.textContent.trim() : null;
-        });
-        
-        if (errorText) {
-          throw new Error(errorText);
-        }
-        throw new Error('Неверный логин или пароль');
-      }
+      await this.validateCredentials(credentials);
+      page = await this.getAuthenticatedPage(credentials);
 
       // Переход к отчетам
       await this.navigateToReports(page);
@@ -49,15 +34,14 @@ export class GuapReportsScraper extends BaseScraper {
       };
 
     } catch (error) {
-      throw error;
-    } finally {
-      if (browser) {
-        await browser.close();
+      if (page) {
+        await this.invalidateSession(credentials);
       }
+      throw error;
     }
   }
 
-  async navigateToReports(page) {
+ async navigateToReports(page) {
     console.log('Переходим на страницу отчетов...');
     await page.goto('https://pro.guap.ru/inside/student/reports/', { 
       waitUntil: 'networkidle2', 
