@@ -19,7 +19,7 @@ export default function MainPage() {
   return (
     <Panel mode="secondary" className="wrap">
       <Flex direction="column" align="stretch" gap={30}>
-        <Container fullWidth>
+        <Container>
           <CellList
             filled
             mode="island"
@@ -33,7 +33,7 @@ export default function MainPage() {
           </CellList>
         </Container>
 
-        <Container fullWidth>
+        <Container >
           <CellList
             filled
             mode="island"
@@ -43,12 +43,12 @@ export default function MainPage() {
           >
             <CellSimple
               before={<Button onClick={() => alert("He")}>09.11</Button>}
-              title="Математика"
+              title="Основы программирования"
               showChevron
             ></CellSimple>
           </CellList>
         </Container>
-        <Container fullWidth>
+        <Container >
           <CellList
             filled
             mode="island"
