@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import styles from "./BottomNavBar.module.css";
-import { Calendar, Home, ScanFace, ToolCase } from "lucide-react";
+import { CircleUser, ScanFace, ToolCase } from "lucide-react";
 
 const navItems = [
   { name: "Главная", href: "/main", Icon: ToolCase },
   { name: "Вход", href: "/auth", Icon: ScanFace },
+  { name: "Профиль", href: "/profile/50384", Icon: CircleUser },
 ];
 
 export default function BottomNavBar() {
