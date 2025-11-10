@@ -8,26 +8,12 @@ export class GuapProfileScraper extends BaseScraper {
     this.authStrategy = GuapAuthStrategy;
   }
 
-  async scrapeProfile(credentials) {
-    let browser;
+    async scrapeProfile(credentials) {
+    let page;
+    
     try {
-      browser = await this.browserManager.launch();
-      const page = await this.browserManager.createPage(browser);
-
-      // Аутентификация
-      const finalUrl = await this.authStrategy.login(page, credentials);
-      
-      if (!this.authStrategy.isLoginSuccessful(finalUrl)) {
-        const errorText = await page.evaluate(() => {
-          const errorElement = document.querySelector('.alert-error');
-          return errorElement ? errorElement.textContent.trim() : null;
-        });
-        
-        if (errorText) {
-          throw new Error(errorText);
-        }
-        throw new Error('Неверный логин или пароль');
-      }
+      await this.validateCredentials(credentials);
+      page = await this.getAuthenticatedPage(credentials);
 
       // Переход к профилю
       await this.navigateToProfile(page);
@@ -42,11 +28,10 @@ export class GuapProfileScraper extends BaseScraper {
       };
 
     } catch (error) {
-      throw error;
-    } finally {
-      if (browser) {
-        await browser.close();
+      if (page) {
+        await this.invalidateSession(credentials);
       }
+      throw error;
     }
   }
 
