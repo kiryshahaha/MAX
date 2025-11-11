@@ -1,4 +1,3 @@
-
 import styles from './TasksTable.module.css';
 
 export default function TasksTable({ tasks, getTaskStatusClass, getDeadlineClass }) {
@@ -17,7 +16,6 @@ export default function TasksTable({ tasks, getTaskStatusClass, getDeadlineClass
               <th>Статус</th>
               <th>Баллы</th>
               <th>Тип задания</th>
-              <th>Доп. статус</th>
               <th>Дедлайн</th>
               <th>Обновлено</th>
               <th>Преподаватель</th>
@@ -28,74 +26,71 @@ export default function TasksTable({ tasks, getTaskStatusClass, getDeadlineClass
             {tasks.map((task, index) => (
               <tr key={index}>
                 <td>
-                  {task.subjectLink ? (
+                  {task.subject?.link ? (
                     <a 
-                      href={task.subjectLink} 
+                      href={task.subject.link} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className={styles.subjectLink}
                     >
-                      {task.subject}
+                      {task.subject.name}
                     </a>
                   ) : (
-                    task.subject
+                    task.subject?.name
                   )}
                 </td>
                 <td className={styles.numberCell}>
-                  {task.taskNumber}
+                  {task.task?.number}
                 </td>
                 <td>
-                  {task.taskLink ? (
+                  {task.task?.link ? (
                     <a 
-                      href={task.taskLink} 
+                      href={task.task.link} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className={styles.taskLink}
                     >
-                      {task.taskName}
+                      {task.task.name}
                     </a>
                   ) : (
-                    task.taskName
+                    task.task?.name
                   )}
                 </td>
                 <td>
-                  <span className={getTaskStatusClass(task.statusClass)}>
-                    {task.status}
+                  <span className={getTaskStatusClass(task.status?.code)}>
+                    {task.status?.text}
                   </span>
                 </td>
                 <td className={styles.scoreCell}>
-                  {task.score}
+                  {task.score?.achieved}/{task.score?.max}
                 </td>
                 <td>
-                  {task.taskType}
+                  {task.task?.type}
                 </td>
-                <td>
-                  {task.additionalStatus}
-                </td>
-                <td className={getDeadlineClass(task.deadlineClass)}>
-                  {task.deadline}
+                <td className={getDeadlineClass(task.deadline?.text)}>
+                  {task.deadline?.text}
                 </td>
                 <td className={styles.updatedAtCell}>
-                  {task.updatedAt}
+                  {task.task?.created_at}
                 </td>
                 <td>
-                  {task.teacherLink ? (
+                  {task.teacher?.link ? (
                     <a 
-                      href={task.teacherLink} 
+                      href={task.teacher.link} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className={styles.teacherLink}
                     >
-                      {task.teacher}
+                      {task.teacher.full_name}
                     </a>
                   ) : (
-                    task.teacher
+                    task.teacher?.full_name
                   )}
                 </td>
                 <td>
-                  {task.actionButton && (
+                  {task.task?.link && (
                     <a 
-                      href={task.actionButton} 
+                      href={task.task.link} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className={styles.actionLink}

@@ -1,4 +1,4 @@
-//parser/scrapers/guap-schedule-scraper.js
+// parser/scrapers/guap-schedule-scraper.js
 import { BaseScraper } from './base-scraper.js';
 import { GuapAuthStrategy } from '../auth/strategies/guap-auth.js';
 
@@ -8,7 +8,7 @@ export class GuapScheduleScraper extends BaseScraper {
     this.authStrategy = GuapAuthStrategy;
   }
 
-   async scrapeSchedule(credentials, year = 2025, week = 44) {
+  async scrapeSchedule(credentials, year = 2025, week = 44) {
     let page;
     
     try {
@@ -23,7 +23,7 @@ export class GuapScheduleScraper extends BaseScraper {
       
       return {
         success: true,
-        message: `✅ Успешный вход! Расписание загружено`,
+        message: `✅ Расписание на неделю ${week} загружено`,
         schedule: scheduleData,
         year: year,
         week: week,
@@ -57,77 +57,104 @@ export class GuapScheduleScraper extends BaseScraper {
   async parseSchedule(page) {
     return await page.evaluate(() => {
       
+      // Функция для парсинга местоположения
+      const parseBuildingAndRoom = (locationText) => {
+        if (!locationText) return { building: '', location: '' };
+        
+        const parts = locationText.split(',');
+        if (parts.length >= 2) {
+          return {
+            building: parts[0].trim(),
+            location: parts[1].trim()
+          };
+        }
+        return {
+          building: locationText.trim(),
+          location: ""
+        };
+      };
+
       // Функция для парсинга ячейки с информацией о занятии
       const parseClassCell = (cell) => {
-        try {
-          // Извлекаем тип занятия (бейдж)
-          const badge = cell.querySelector('.badge');
-          const type = badge ? badge.textContent.trim() : '';
+      try {
+        // Извлекаем тип занятия (бейдж)
+        const badge = cell.querySelector('.badge.bg-primary');
+        const type = badge ? badge.textContent.trim() : '';
 
-          // Извлекаем название предмета
-          const subjectElement = cell.querySelector('.fw-bolder');
-          const subject = subjectElement ? subjectElement.textContent.trim() : '';
+        // Извлекаем название предмета
+        const subjectElement = cell.querySelector('.fw-bolder');
+        const subject = subjectElement ? subjectElement.textContent.trim() : '';
 
-          // Извлекаем информацию о преподавателе
-          const teacherElement = cell.querySelector('[class*="teacher"]');
-          let teacher = '';
-          let teacherInfo = '';
+        // Извлекаем информацию о преподавателе
+        const teacherElement = cell.querySelector('[class*="teacher"], .short-teacher');
+        let teacher = '';
+        let teacherInfo = '';
+        
+        if (teacherElement) {
+          // Берем текст до span (имя преподавателя)
+          const teacherText = teacherElement.childNodes[0]?.textContent?.trim() || '';
+          teacher = teacherText.replace('Жучкова М.Г.', 'Жучкова М.Г.').trim(); // Пример корректного имени
           
-          if (teacherElement) {
-            teacher = teacherElement.textContent.trim().replace(/\s+/g, ' ').trim();
-            // Извлекаем информацию о должности из span
-            const teacherSpan = teacherElement.querySelector('span');
-            if (teacherSpan) {
-              teacherInfo = teacherSpan.textContent.trim();
-              // Убираем скобки если есть
-              teacherInfo = teacherInfo.replace(/[()]/g, '').trim();
+          // Извлекаем информацию о должности из span
+          const teacherSpan = teacherElement.querySelector('span');
+          if (teacherSpan) {
+            teacherInfo = teacherSpan.textContent.trim();
+            // Убираем скобки если есть
+            teacherInfo = teacherInfo.replace(/[()]/g, '').trim();
+          }
+        }
+
+        // Извлекаем информацию о группе
+        const groupBadge = cell.querySelector('.badge.bg-dark');
+        const group = groupBadge ? groupBadge.textContent.trim() : '';
+
+        // Извлекаем информацию о местоположении - ИСПРАВЛЕННЫЙ КОД
+        const locationElement = cell.querySelector('.bi-geo-alt');
+        let building = '';
+        let location = '';
+        
+        if (locationElement && locationElement.parentElement) {
+          // Берем только текст после иконки локации
+          const locationText = locationElement.nextSibling?.textContent?.trim() || '';
+          
+          if (locationText) {
+            const parts = locationText.split(',');
+            if (parts.length >= 2) {
+              building = parts[0].trim();
+              location = parts[1].trim();
+            } else {
+              // Если нет запятой, пробуем разделить по последнему пробелу
+              const words = locationText.split(' ');
+              if (words.length > 1) {
+                const lastWord = words[words.length - 1];
+                // Проверяем, похоже ли на номер аудитории
+                if (lastWord.match(/[\d-]/)) {
+                  building = words.slice(0, -1).join(' ').trim();
+                  location = lastWord;
+                } else {
+                  building = locationText;
+                }
+              } else {
+                building = locationText;
+              }
             }
           }
-
-          // Извлекаем информацию о группе
-          const groupBadge = cell.querySelector('.badge.bg-dark');
-          const group = groupBadge ? groupBadge.textContent.trim() : '';
-
-          // Извлекаем информацию о аудитории
-          const locationElement = cell.querySelector('.bi-geo-alt');
-          let location = '';
-          if (locationElement && locationElement.parentElement) {
-            location = locationElement.parentElement.textContent.trim();
-            // Очищаем текст от лишних элементов
-            location = location.replace('📍', '')
-                              .replace('bi-geo-alt', '')
-                              .replace(/\s+/g, ' ')
-                              .trim();
-          }
-
-          // Форматируем текст для отображения
-          const formattedText = formatClassText(subject, teacher, location, group, type);
-
-          return {
-            type: type,
-            subject: subject,
-            teacher: teacher,
-            teacherInfo: teacherInfo,
-            group: group,
-            location: location,
-            formattedText: formattedText
-          };
-        } catch (error) {
-          console.error('Ошибка парсинга ячейки:', error);
-          return null;
         }
-      };
 
-      // Функция для форматирования текста занятия
-      const formatClassText = (subject, teacher, location, group, type) => {
-        let text = '';
-        if (type) text += `${type}\n`;
-        if (subject) text += `${subject}\n`;
-        if (teacher) text += `${teacher}\n`;
-        if (group) text += `Группа: ${group}\n`;
-        if (location) text += `${location}`;
-        return text.trim();
-      };
+        return {
+          type: type,
+          subject: subject,
+          teacher: teacher,
+          teacherInfo: teacherInfo,
+          group: group,
+          building: building,
+          location: location
+        };
+      } catch (error) {
+        console.error('Ошибка парсинга ячейки:', error);
+        return null;
+      }
+    };
 
       // Порядок дней недели для сортировки
       const dayOrder = {
@@ -170,12 +197,9 @@ export class GuapScheduleScraper extends BaseScraper {
           }
 
           return {
-            name: header.textContent.trim(),
-            dayName: dayName,
             date: date,
             fullDate: fullDate,
-            link: link ? link.href : '',
-            rawText: linkText,
+            dayName: dayName,
             order: dayOrder[dayName] || 0,
             classes: []
           };
@@ -224,10 +248,7 @@ export class GuapScheduleScraper extends BaseScraper {
           if (cell && cell.textContent.trim() !== '') {
             const classData = parseClassCell(cell);
             if (classData) {
-              schedule.extraClasses.push({
-                type: 'extra',
-                ...classData
-              });
+              schedule.extraClasses.push(classData);
             }
           }
         });

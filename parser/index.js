@@ -1,7 +1,9 @@
+// index.js
 import { GuapTasksScraper } from './scrapers/guap-tasks-scraper.js';
 import { GuapReportsScraper } from './scrapers/guap-reports-scraper.js';
 import { GuapProfileScraper } from './scrapers/guap-profile-scraper.js';
 import { GuapScheduleScraper } from './scrapers/guap-schedule-scraper.js';
+import { GuapDailyScheduleScraper } from './scrapers/guap-daily-schedule-scraper.js';
 import { GuapMarksScraper } from './scrapers/guap-marks-scraper.js';
 import { ErrorHandler } from './utils/error-handler.js';
 
@@ -47,6 +49,18 @@ export async function scrapeGuapSchedule(credentials, year = 2025, week = 44) {
   try {
     await scraper.validateCredentials(credentials);
     const result = await scraper.scrapeSchedule(credentials, year, week);
+    return result;
+  } catch (error) {
+    return ErrorHandler.handleScrapingError(error);
+  }
+}
+
+export async function scrapeGuapDailySchedule(credentials, date) {
+  const scraper = new GuapDailyScheduleScraper();
+  
+  try {
+    await scraper.validateCredentials(credentials);
+    const result = await scraper.scrapeDailySchedule(credentials, date);
     return result;
   } catch (error) {
     return ErrorHandler.handleScrapingError(error);

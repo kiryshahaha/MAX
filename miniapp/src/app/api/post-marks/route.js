@@ -49,12 +49,28 @@ export async function POST(request) {
           userId: userResult.userId
         });
         
-        // Сохранение оценок в user_data
-        const saveResult = await marksService.saveUserMarks(userResult.userId, result.marks);
+        // Сохранение оценок в user_data (с проверкой семестра и фильтров)
+        const saveResult = await marksService.saveUserMarks(
+          userResult.userId, 
+          result.marks, 
+          semester, // передаем как есть, нормализация будет в сервисе
+          { contrType, mark }
+        );
+        
         console.log('💾 Результат сохранения оценок:', saveResult);
         
-        // Проверяем, что данные действительно сохранились
-        if (saveResult) {
+        // Добавляем информацию о семестре и фильтрах в результат
+        result.semesterInfo = {
+          requested: semester,
+          current: saveResult.currentSemester,
+          saved: saveResult.saved,
+          skipped: saveResult.skipped,
+          reason: saveResult.reason,
+          filters: saveResult.filters
+        };
+        
+        // Проверяем, что данные действительно сохранились (только если не были пропущены)
+        if (saveResult && !saveResult.skipped) {
           console.log('✅ Оценки успешно сохранены в БД');
           
           // Дополнительная проверка: читаем обратно из БД
@@ -70,6 +86,9 @@ export async function POST(request) {
             console.log('✅ Проверка БД: сохранено оценок:', checkData.marks?.length);
             console.log('✅ Время обновления:', checkData.updated_at);
           }
+        } else if (saveResult.skipped) {
+          console.log('⏩ Сохранение оценок пропущено:', saveResult.reason);
+          result.message = `✅ Оценки получены, но не сохранены (${saveResult.reason === 'not_current_semester' ? 'не текущий семестр' : 'применены фильтры'})`;
         }
         
         // Логируем успешный вход

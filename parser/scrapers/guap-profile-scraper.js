@@ -51,7 +51,17 @@ export class GuapProfileScraper extends BaseScraper {
 
   async parseProfile(page) {
     return await page.evaluate(() => {
-      const profile = {};
+      const profile = {
+        personal_info: {},
+        academic_info: {},
+        program_info: {
+          specialty: {}
+        },
+        contacts: {},
+        academic_context: {
+          available_cabinets: []
+        }
+      };
 
       // Основная информация из первой карточки
       const mainCard = document.querySelector('.card.shadow-sm');
@@ -59,13 +69,13 @@ export class GuapProfileScraper extends BaseScraper {
         // Фотография профиля
         const profileImage = mainCard.querySelector('.profile_image');
         if (profileImage) {
-          profile.photoUrl = profileImage.src;
+          profile.personal_info.photo_url = profileImage.src;
         }
 
         // ФИО
         const nameElement = mainCard.querySelector('h3.text-center');
         if (nameElement) {
-          profile.fullName = nameElement.textContent.trim();
+          profile.personal_info.full_name = nameElement.textContent.trim();
         }
 
         // Информация из списка
@@ -78,32 +88,32 @@ export class GuapProfileScraper extends BaseScraper {
             const value = valueElement ? valueElement.textContent.trim() : '';
 
             if (headingText.includes('Институт/факультет')) {
-              profile.institute = value;
+              profile.program_info.institute = value;
             } else if (headingText.includes('Группа')) {
-              profile.group = value;
+              profile.academic_info.group = value;
             } else if (headingText.includes('Номер студенческого билета') || headingText.includes('зачетной книжки')) {
-              profile.studentId = value;
+              profile.personal_info.student_id = value;
             } else if (headingText.includes('Специальность')) {
-              profile.specialty = value;
+              profile.program_info.specialty.full_name = value;
               // Извлекаем чистую специальность без кода
               const cleanSpecialty = value.replace(/\d{2}\.\d{2}\.\d{2}\s*/, '').trim();
-              profile.cleanSpecialty = cleanSpecialty;
+              profile.program_info.specialty.name = cleanSpecialty;
               
               // Код специальности
               const codeMatch = value.match(/\d{2}\.\d{2}\.\d{2}/);
               if (codeMatch) {
-                profile.specialtyCode = codeMatch[0];
+                profile.program_info.specialty.code = codeMatch[0];
               }
             } else if (headingText.includes('Направленность')) {
-              profile.direction = value;
+              profile.program_info.direction = value;
             } else if (headingText.includes('Форма обучения')) {
-              profile.educationForm = value;
+              profile.academic_info.education_form = value;
             } else if (headingText.includes('Уровень профессионального образования')) {
-              profile.educationLevel = value;
+              profile.academic_info.education_level = value;
             } else if (headingText.includes('Статус')) {
-              profile.status = value;
+              profile.academic_info.status = value;
             } else if (headingText.includes('Приказ о зачислении')) {
-              profile.enrollmentOrder = value;
+              profile.academic_info.enrollment_order = value;
             }
           }
         });
@@ -112,8 +122,6 @@ export class GuapProfileScraper extends BaseScraper {
       // Контактная информация из второй карточки
       const contactsCard = document.querySelectorAll('.card.shadow-sm')[1];
       if (contactsCard) {
-        profile.contacts = {};
-        
         const contactItems = contactsCard.querySelectorAll('.list-group-item');
         contactItems.forEach(item => {
           const heading = item.querySelector('h5');
@@ -123,9 +131,9 @@ export class GuapProfileScraper extends BaseScraper {
             const value = valueElement ? valueElement.textContent.trim() : '';
 
             if (headingText.includes('Email')) {
-              profile.contacts.email = value;
+              profile.contacts.primary_email = value;
             } else if (headingText.includes('Почта аккаунта')) {
-              profile.contacts.accountEmail = value;
+              profile.contacts.secondary_email = value;
             } else if (headingText.includes('Телефон')) {
               profile.contacts.phone = value;
             }
@@ -136,28 +144,27 @@ export class GuapProfileScraper extends BaseScraper {
       // Информация о личных кабинетах из третьей карточки
       const cabinetCard = document.querySelectorAll('.card.shadow-sm')[2];
       if (cabinetCard) {
-        profile.availableCabinets = [];
-        
         const selectElement = cabinetCard.querySelector('select[name="eid"]');
         if (selectElement) {
           const options = selectElement.querySelectorAll('option');
           options.forEach(option => {
             if (option.value && option.textContent) {
-              profile.availableCabinets.push({
-                value: option.value,
-                label: option.textContent.trim(),
-                selected: option.selected
-              });
+              const cabinet = {
+                id: option.value,
+                name: option.textContent.trim(),
+                is_selected: option.selected
+              };
+              
+              profile.academic_context.available_cabinets.push(cabinet);
+              
+              // Устанавливаем текущий кабинет если он выбран
+              if (option.selected) {
+                profile.academic_context.current_cabinet = cabinet;
+              }
             }
           });
         }
-
-        // Текущий выбранный кабинет
-        profile.currentCabinet = profile.availableCabinets.find(cab => cab.selected);
       }
-
-      // Дополнительная информация
-      profile.scrapedAt = new Date().toISOString();
 
       return profile;
     });

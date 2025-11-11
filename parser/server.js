@@ -1,6 +1,14 @@
+// server.js
 import express from 'express';
 import cors from 'cors';
-import { scrapeGuapTasks, scrapeGuapReports, scrapeGuapProfile, scrapeGuapSchedule, scrapeGuapMarks } from './index.js';
+import { 
+  scrapeGuapTasks, 
+  scrapeGuapReports, 
+  scrapeGuapProfile, 
+  scrapeGuapSchedule, 
+  scrapeGuapDailySchedule,
+  scrapeGuapMarks 
+} from './index.js';
 import { SessionManager } from './core/session-manager.js';
 
 setInterval(() => {
@@ -29,7 +37,7 @@ process.on('SIGTERM', async () => {
 app.post('/api/logout', async (req, res) => {
   try {
     const { username } = req.body;
-    const userId = username; // или другой идентификатор
+    const userId = username;
     
     const session = SessionManager.sessions.get(userId);
     if (session) {
@@ -57,10 +65,10 @@ app.get('/api/sessions', (req, res) => {
   });
 });
 
-// Универсальный эндпоинт для парсинга
-app.post('/api/scrape', async (req, res) => {
+// Эндпоинт для расписания на день
+app.post('/api/scrape/daily-schedule', async (req, res) => {
   try {
-    const { username, password, type = 'tasks' } = req.body;
+    const { username, password, date } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({
@@ -69,26 +77,52 @@ app.post('/api/scrape', async (req, res) => {
       });
     }
 
-    console.log(`Запрос на парсинг для пользователя: ${username}, тип: ${type}`);
-    
-    let result;
-    if (type === 'reports') {
-      result = await scrapeGuapReports({ username, password });
-    } else {
-      result = await scrapeGuapTasks({ username, password });
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: '❌ Укажите дату в формате YYYY-MM-DD'
+      });
     }
+
+    console.log(`Запрос на парсинг расписания за ${date} для пользователя: ${username}`);
+    const result = await scrapeGuapDailySchedule({ username, password }, date);
     
     res.json(result);
   } catch (error) {
-    console.error('Ошибка в API парсера:', error);
+    console.error('Ошибка в API парсера расписания на день:', error);
     res.status(500).json({
       success: false,
-      message: `❌ Ошибка парсера: ${error.message}`
+      message: `❌ Ошибка парсера расписания: ${error.message}`
     });
   }
 });
 
-// Отдельные эндпоинты для обратной совместимости
+// Эндпоинт для расписания на неделю
+app.post('/api/scrape/schedule', async (req, res) => {
+  try {
+    const { username, password, year = 2025, week = 44 } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: '❌ Укажите логин и пароль'
+      });
+    }
+
+    console.log(`Запрос на парсинг расписания для пользователя: ${username}, год: ${year}, неделя: ${week}`);
+    const result = await scrapeGuapSchedule({ username, password }, year, week);
+    
+    res.json(result);
+  } catch (error) {
+    console.error('Ошибка в API парсера расписания:', error);
+    res.status(500).json({
+      success: false,
+      message: `❌ Ошибка парсера расписания: ${error.message}`
+    });
+  }
+});
+
+// Остальные эндпоинты остаются без изменений...
 app.post('/api/scrape/tasks', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -157,31 +191,6 @@ app.post('/api/scrape/profile', async (req, res) => {
     res.status(500).json({
       success: false,
       message: `❌ Ошибка парсера профиля: ${error.message}`
-    });
-  }
-});
-
-// Новый эндпоинт для расписания
-app.post('/api/scrape/schedule', async (req, res) => {
-  try {
-    const { username, password, year = 2025, week = 44 } = req.body;
-
-    if (!username || !password) {
-      return res.status(400).json({
-        success: false,
-        message: '❌ Укажите логин и пароль'
-      });
-    }
-
-    console.log(`Запрос на парсинг расписания для пользователя: ${username}, год: ${year}, неделя: ${week}`);
-    const result = await scrapeGuapSchedule({ username, password }, year, week);
-    
-    res.json(result);
-  } catch (error) {
-    console.error('Ошибка в API парсера расписания:', error);
-    res.status(500).json({
-      success: false,
-      message: `❌ Ошибка парсера расписания: ${error.message}`
     });
   }
 });

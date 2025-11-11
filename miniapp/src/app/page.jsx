@@ -17,9 +17,11 @@ export default function Home() {
   const [schedule, setSchedule] = useState(null);
   const [activeTab, setActiveTab] = useState('tasks');
   const [isLoading, setIsLoading] = useState(false);
+  const [scheduleType, setScheduleType] = useState('week'); // 'week' или 'day'
   const [scheduleParams, setScheduleParams] = useState({
-    year: 2025,
-    week: 44
+    year: new Date().getFullYear(),
+    week: getCurrentWeek(),
+    date: getTodayDate()
   });
   const [marksParams, setMarksParams] = useState({
     semester: '3',
@@ -27,6 +29,28 @@ export default function Home() {
     teacher: '0',
     mark: '0'
   });
+
+  // Функции для получения текущей даты
+  function getCurrentWeek() {
+    const today = new Date();
+    const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+    const pastDaysOfYear = (today - firstDayOfYear) / 86400000;
+    return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+  }
+
+  function getTodayDate() {
+    const today = new Date();
+    return today.toISOString().split('T')[0]; // "2025-01-15"
+  }
+
+  function formatDateForDisplay(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ru-RU', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,13 +67,22 @@ export default function Home() {
       let body;
 
       if (activeTab === 'schedule') {
-        endpoint = '/api/post-schedule';
-        body = JSON.stringify({
-          username,
-          password,
-          year: scheduleParams.year,
-          week: scheduleParams.week
-        });
+        if (scheduleType === 'week') {
+          endpoint = '/api/post-schedule';
+          body = JSON.stringify({
+            username,
+            password,
+            year: scheduleParams.year,
+            week: scheduleParams.week
+          });
+        } else {
+          endpoint = '/api/post-daily-schedule';
+          body = JSON.stringify({
+            username,
+            password,
+            date: scheduleParams.date
+          });
+        }
       } else if (activeTab === 'marks') {
         endpoint = '/api/post-marks';
         body = JSON.stringify({
@@ -94,8 +127,13 @@ export default function Home() {
           setStatus(`✅ Профиль успешно получен`);
         } else if (activeTab === 'schedule' && data.schedule) {
           setSchedule(data.schedule);
-          const totalClasses = (data.schedule.regularClasses?.length || 0) + (data.schedule.extraClasses?.length || 0);
-          setStatus(`✅ Расписание получено (${totalClasses} занятий)`);
+          if (scheduleType === 'week') {
+            const totalClasses = (data.schedule.days?.reduce((sum, day) => sum + day.classes.length, 0) || 0) + 
+                               (data.schedule.extraClasses?.length || 0);
+            setStatus(`✅ Расписание на неделю получено (${totalClasses} занятий)`);
+          } else {
+            setStatus(`✅ Расписание на ${formatDateForDisplay(data.date)} получено (${data.schedule.length} занятий)`);
+          }
         } else {
           setStatus(data.message || 'Данные успешно получены');
         }
@@ -124,13 +162,22 @@ export default function Home() {
       let body;
 
       if (activeTab === 'schedule') {
-        endpoint = '/api/post-schedule';
-        body = JSON.stringify({
-          username,
-          password,
-          year: scheduleParams.year,
-          week: scheduleParams.week
-        });
+        if (scheduleType === 'week') {
+          endpoint = '/api/post-schedule';
+          body = JSON.stringify({
+            username,
+            password,
+            year: scheduleParams.year,
+            week: scheduleParams.week
+          });
+        } else {
+          endpoint = '/api/post-daily-schedule';
+          body = JSON.stringify({
+            username,
+            password,
+            date: scheduleParams.date
+          });
+        }
       } else if (activeTab === 'marks') {
         endpoint = '/api/post-marks';
         body = JSON.stringify({
@@ -175,8 +222,13 @@ export default function Home() {
           setStatus(`✅ Профиль успешно обновлен`);
         } else if (activeTab === 'schedule' && data.schedule) {
           setSchedule(data.schedule);
-          const totalClasses = (data.schedule.regularClasses?.length || 0) + (data.schedule.extraClasses?.length || 0);
-          setStatus(`✅ Расписание обновлено (${totalClasses} занятий)`);
+          if (scheduleType === 'week') {
+            const totalClasses = (data.schedule.days?.reduce((sum, day) => sum + day.classes.length, 0) || 0) + 
+                               (data.schedule.extraClasses?.length || 0);
+            setStatus(`✅ Расписание на неделю обновлено (${totalClasses} занятий)`);
+          } else {
+            setStatus(`✅ Расписание на ${formatDateForDisplay(data.date)} обновлено (${data.schedule.length} занятий)`);
+          }
         } else {
           setStatus(data.message || 'Данные успешно обновлены');
         }
@@ -203,6 +255,12 @@ export default function Home() {
       ...prev,
       [param]: value
     }));
+  };
+
+  const handleScheduleTypeChange = (type) => {
+    setScheduleType(type);
+    // Сбрасываем расписание при смене типа
+    setSchedule(null);
   };
 
   const getStatusClass = () => {
@@ -259,12 +317,28 @@ export default function Home() {
 
   const getTotalClassesCount = () => {
     if (!schedule) return 0;
-    return (schedule.regularClasses?.length || 0) + (schedule.extraClasses?.length || 0);
+    
+    if (scheduleType === 'week') {
+      return (schedule.days?.reduce((sum, day) => sum + day.classes.length, 0) || 0) + 
+             (schedule.extraClasses?.length || 0);
+    } else {
+      return schedule.length || 0;
+    }
   };
 
   const getTotalCredits = () => {
     return marks.reduce((total, mark) => total + (mark.creditsValue || 0), 0);
   };
+
+  // Автоматическое обновление даты при смене дня
+  useEffect(() => {
+    if (activeTab === 'schedule' && scheduleType === 'day') {
+      setScheduleParams(prev => ({
+        ...prev,
+        date: getTodayDate()
+      }));
+    }
+  }, [activeTab, scheduleType]);
 
   return (
     <div className={styles.container}>
@@ -291,28 +365,88 @@ export default function Home() {
         {/* Параметры расписания (только для вкладки расписания) */}
         {activeTab === 'schedule' && (
           <div className={styles.scheduleParams}>
-            <div className={styles.paramGroup}>
-              <label className={styles.paramLabel}>Год:</label>
-              <input
-                type="number"
-                value={scheduleParams.year}
-                onChange={(e) => handleScheduleParamChange('year', parseInt(e.target.value))}
-                className={styles.paramInput}
-                min="2024"
-                max="2030"
-              />
+            {/* Выбор типа расписания */}
+            <div className={styles.scheduleTypeSelector}>
+              <button
+                type="button"
+                className={`${styles.scheduleTypeButton} ${scheduleType === 'week' ? styles.scheduleTypeActive : ''}`}
+                onClick={() => handleScheduleTypeChange('week')}
+              >
+                Неделя
+              </button>
+              <button
+                type="button"
+                className={`${styles.scheduleTypeButton} ${scheduleType === 'day' ? styles.scheduleTypeActive : ''}`}
+                onClick={() => handleScheduleTypeChange('day')}
+              >
+                День
+              </button>
             </div>
-            <div className={styles.paramGroup}>
-              <label className={styles.paramLabel}>Неделя:</label>
-              <input
-                type="number"
-                value={scheduleParams.week}
-                onChange={(e) => handleScheduleParamChange('week', parseInt(e.target.value))}
-                className={styles.paramInput}
-                min="1"
-                max="52"
-              />
-            </div>
+
+            {/* Параметры для недельного расписания */}
+            {scheduleType === 'week' && (
+              <div className={styles.weekParams}>
+                <div className={styles.paramGroup}>
+                  <label className={styles.paramLabel}>Год:</label>
+                  <input
+                    type="number"
+                    value={scheduleParams.year}
+                    onChange={(e) => handleScheduleParamChange('year', parseInt(e.target.value))}
+                    className={styles.paramInput}
+                    min="2024"
+                    max="2030"
+                  />
+                </div>
+                <div className={styles.paramGroup}>
+                  <label className={styles.paramLabel}>Неделя:</label>
+                  <input
+                    type="number"
+                    value={scheduleParams.week}
+                    onChange={(e) => handleScheduleParamChange('week', parseInt(e.target.value))}
+                    className={styles.paramInput}
+                    min="1"
+                    max="52"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Параметры для дневного расписания */}
+            {scheduleType === 'day' && (
+              <div className={styles.dayParams}>
+                <div className={styles.paramGroup}>
+                  <label className={styles.paramLabel}>Дата:</label>
+                  <input
+                    type="date"
+                    value={scheduleParams.date}
+                    onChange={(e) => handleScheduleParamChange('date', e.target.value)}
+                    className={styles.paramInput}
+                    min="2024-01-01"
+                    max="2030-12-31"
+                  />
+                </div>
+                <div className={styles.dateQuickActions}>
+                  <button
+                    type="button"
+                    className={styles.quickActionButton}
+                    onClick={() => handleScheduleParamChange('date', getTodayDate())}
+                  >
+                    Сегодня
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.quickActionButton}
+                    onClick={() => {
+                      const tomorrow = new Date();
+                      tomorrow.setDate(tomorrow.getDate() + 1);
+                      handleScheduleParamChange('date', tomorrow.toISOString().split('T')[0]);
+                    }}
+                  >
+                    Завтра
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -643,11 +777,16 @@ export default function Home() {
           <div className={styles.scheduleHeader}>
             <div className={styles.scheduleInfo}>
               <h3 className={styles.scheduleTitle}>
-                Расписание на {scheduleParams.year} год, неделя {scheduleParams.week}
+                {scheduleType === 'week' 
+                  ? `Расписание на ${scheduleParams.year} год, неделя ${scheduleParams.week}`
+                  : `Расписание на ${formatDateForDisplay(scheduleParams.date)}`
+                }
               </h3>
               <div className={styles.scheduleStats}>
-                Регулярных занятий: {schedule.regularClasses?.length || 0} |
-                Вне сетки: {schedule.extraClasses?.length || 0}
+                {scheduleType === 'week' 
+                  ? `Дней с занятиями: ${schedule.days?.length || 0} | Всего занятий: ${getTotalClassesCount()}`
+                  : `Занятий: ${getTotalClassesCount()}`
+                }
               </div>
             </div>
             <button
@@ -659,7 +798,8 @@ export default function Home() {
             </button>
           </div>
 
-          {schedule.days && schedule.days.length > 0 && (
+          {/* Отображение недельного расписания */}
+          {scheduleType === 'week' && schedule.days && schedule.days.length > 0 && (
             <div className={styles.scheduleSection}>
               <h4 className={styles.scheduleSectionTitle}>Основное расписание</h4>
               <div className={styles.scheduleTable}>
@@ -711,10 +851,6 @@ export default function Home() {
                               Группа: {classItem.group}
                             </div>
                           )}
-                          {/* Форматированный текст */}
-                          <div className={styles.formattedText}>
-                            {classItem.formattedText}
-                          </div>
                         </div>
                       </div>
                     ))}
@@ -724,8 +860,52 @@ export default function Home() {
             </div>
           )}
 
-          {/* Занятия вне сетки */}
-          {schedule.extraClasses && schedule.extraClasses.length > 0 && (
+          {/* Отображение дневного расписания */}
+          {scheduleType === 'day' && schedule.length > 0 && (
+            <div className={styles.scheduleSection}>
+              <h4 className={styles.scheduleSectionTitle}>Расписание на день</h4>
+              <div className={styles.scheduleTable}>
+                {schedule.map((classItem, index) => (
+                  <div key={index} className={styles.scheduleItem}>
+                    <div className={styles.classHeader}>
+                      <span className={`${styles.classType} ${getScheduleTypeClass(classItem.type)}`}>
+                        {classItem.type}
+                      </span>
+                      <span className={styles.classTime}>
+                        {classItem.pairNumber} пара ({classItem.timeRange})
+                      </span>
+                    </div>
+                    <div className={styles.classBody}>
+                      <div className={styles.classSubject}>{classItem.subject}</div>
+                      {classItem.teacher && (
+                        <div className={styles.classTeacher}>
+                          <span className={styles.teacherIcon}>👤</span>
+                          {classItem.teacher}
+                          {classItem.teacherInfo && (
+                            <span className={styles.teacherInfo}> ({classItem.teacherInfo})</span>
+                          )}
+                        </div>
+                      )}
+                      {classItem.location && (
+                        <div className={styles.classLocation}>
+                          <span className={styles.locationIcon}>📍</span>
+                          {classItem.location}
+                        </div>
+                      )}
+                      {classItem.group && (
+                        <div className={styles.classGroup}>
+                          Группа: {classItem.group}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Занятия вне сетки (только для недельного расписания) */}
+          {scheduleType === 'week' && schedule.extraClasses && schedule.extraClasses.length > 0 && (
             <div className={styles.scheduleSection}>
               <h4 className={styles.scheduleSectionTitle}>Занятия вне сетки расписания</h4>
               <div className={styles.scheduleTable}>
@@ -756,6 +936,14 @@ export default function Home() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Сообщение если нет занятий */}
+          {((scheduleType === 'week' && (!schedule.days || schedule.days.length === 0) && (!schedule.extraClasses || schedule.extraClasses.length === 0)) ||
+            (scheduleType === 'day' && schedule.length === 0)) && (
+            <div className={styles.noData}>
+              <p>На выбранную дату занятий нет</p>
             </div>
           )}
         </>

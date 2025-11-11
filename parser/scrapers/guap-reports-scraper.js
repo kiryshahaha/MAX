@@ -112,9 +112,7 @@ export class GuapReportsScraper extends BaseScraper {
       // Добавляем отчеты с проверкой на дубликаты
       const newReports = pageReports.filter(report => 
         !allReports.some(existingReport => 
-          existingReport.taskName === report.taskName && 
-          existingReport.teacher === report.teacher &&
-          existingReport.uploadDate === report.uploadDate
+          existingReport.task?.id === report.task?.id
         )
       );
       
@@ -217,107 +215,184 @@ export class GuapReportsScraper extends BaseScraper {
     }
   }
 
-  async parseReportsTable(page) {
-    return await page.evaluate(() => {
-      const reports = [];
-      const tables = document.querySelectorAll('table');
-      
-      if (tables.length === 0) {
-        console.log('Таблицы не найдены');
-        return reports;
-      }
+async parseReportsTable(page) {
+  return await page.evaluate(() => {
+    const reports = [];
+    const tables = document.querySelectorAll('table');
+    
+    if (tables.length === 0) {
+      console.log('Таблицы не найдены');
+      return reports;
+    }
 
-      const rows = tables[0].querySelectorAll('tbody tr');
-      console.log(`Найдено строк в таблице: ${rows.length}`);
+    const rows = tables[0].querySelectorAll('tbody tr');
+    console.log(`Найдено строк в таблице: ${rows.length}`);
+    
+    rows.forEach((row, index) => {
+      const cells = row.querySelectorAll('td');
+      console.log(`Строка ${index}: ${cells.length} ячеек`);
       
-      rows.forEach((row, index) => {
-        const cells = row.querySelectorAll('td');
-        console.log(`Строка ${index}: ${cells.length} ячеек`);
+      // Для отладки - выводим содержимое всех ячеек
+      console.log(`Содержимое ячеек строки ${index}:`);
+      cells.forEach((cell, cellIndex) => {
+        console.log(`Ячейка ${cellIndex}:`, cell.textContent?.trim());
+      });
+
+      // Определяем структуру колонок на основе HTML
+      if (cells.length >= 7) {
+        let downloadButton, numberElement, taskLink;
+        let teacherLink, statusBadge, scoreElement, uploadDateElement;
+
+        // Анализируем структуру по классам и содержимому
+        // Ячейка 0: Действия
+        if (cells[0]) {
+          downloadButton = cells[0].querySelector('a.btn-outline-dark');
+        }
         
-        // Определяем структуру колонок на основе HTML
-        if (cells.length >= 7) {
-          let downloadButton, removeButton, numberElement, taskLink;
-          let teacherLink, statusBadge, scoreElement, uploadDateElement;
-
-          // Анализируем структуру по классам и содержимому
-          for (let i = 0; i < cells.length; i++) {
-            const cell = cells[i];
-            const cellContent = cell.textContent?.trim() || '';
-            
-            // Действия (первая ячейка с кнопками)
-            if (i === 0) {
-              downloadButton = cell.querySelector('a.btn-outline-dark');
-              removeButton = cell.querySelector('a.btn-danger');
-            }
-            // Номер (текст с числом, обычно центрирован)
-            else if (i === 1 && cell.querySelector('span.text-center') && /^\d+$/.test(cellContent)) {
-              numberElement = cell.querySelector('span.text-center');
-            }
-            // Задание (ссылка с классом blue-link)
-            else if (i === 2 && cell.querySelector('a.blue-link')) {
-              taskLink = cell.querySelector('a.blue-link');
-            }
-            // Преподаватель (ссылка с классом blue-link в центрированной ячейке)
-            else if (i === 3 && cell.classList.contains('text-center') && cell.querySelector('a.blue-link')) {
-              teacherLink = cell.querySelector('a.blue-link');
-            }
-            // Статус (бейдж)
-            else if (i === 4 && cell.querySelector('.badge')) {
-              statusBadge = cell.querySelector('.badge');
-            }
-            // Баллы (текст в центрированной ячейке)
-            else if (i === 5 && cell.classList.contains('text-center')) {
-              scoreElement = cell.querySelector('span');
-            }
-            // Дата загрузки (текст в центрированной ячейке)
-            else if (i === 6 && cell.classList.contains('text-center')) {
-              uploadDateElement = cell.querySelector('span');
-            }
+        // Ячейка 1: Номер
+        if (cells[1]) {
+          numberElement = cells[1].querySelector('span.text-center');
+        }
+        
+        // Ячейка 2: Задание
+        if (cells[2]) {
+          taskLink = cells[2].querySelector('a.blue-link');
+        }
+        
+        // Ячейка 3: Преподаватель
+        if (cells[3]) {
+          teacherLink = cells[3].querySelector('a.blue-link');
+        }
+        
+        // Ячейка 4: Статус
+        if (cells[4]) {
+          statusBadge = cells[4].querySelector('.badge');
+        }
+        
+        // Ячейка 5: Баллы
+        if (cells[5]) {
+          scoreElement = cells[5].querySelector('span');
+        }
+        
+        // Ячейка 6: Дата загрузки
+        if (cells[6]) {
+          const textCenterDiv = cells[6].querySelector('.text-center');
+          if (textCenterDiv) {
+            uploadDateElement = textCenterDiv.querySelector('span');
           }
-
-          const report = {
-            // Действия
-            downloadButton: downloadButton?.href || '',
-            removeButton: removeButton?.href || '',
-            
-            // Номер
-            number: numberElement?.textContent?.trim() || '',
-            
-            // Задание
-            taskName: taskLink?.textContent?.trim() || '',
-            taskLink: taskLink?.href || '',
-            
-            // Преподаватель
-            teacher: teacherLink?.textContent?.trim() || '',
-            teacherLink: teacherLink?.href || '',
-            
-            // Статус
-            status: statusBadge?.textContent?.trim() || '',
-            statusClass: statusBadge?.className || '',
-            
-            // Баллы
-            score: scoreElement?.textContent?.trim() || '―',
-            
-            // Дата загрузки
-            uploadDate: uploadDateElement?.textContent?.trim() || ''
-          };
-          
-          console.log(`Отчет ${index}:`, {
-            taskName: report.taskName,
-            teacher: report.teacher,
-            status: report.status,
-            score: report.score,
-            uploadDate: report.uploadDate
-          });
-          
-          // Добавляем отчет если есть хотя бы название задания
-          if (report.taskName) {
-            reports.push(report);
+          // Если не нашли span, используем текст из ячейки
+          if (!uploadDateElement) {
+            uploadDateElement = { textContent: cells[6].textContent?.trim() || '' };
           }
         }
-      });
-      
-      return reports;
+
+        // Извлекаем ID задачи из ссылки
+        let taskId = null;
+        if (taskLink?.href) {
+          const taskIdMatch = taskLink.href.match(/\/tasks\/(\d+)/);
+          if (taskIdMatch) {
+            taskId = parseInt(taskIdMatch[1]);
+          }
+        }
+
+        // Определяем статус
+        let statusCode = 'unknown';
+        let statusText = statusBadge?.textContent?.trim() || '';
+        
+        if (statusText.toLowerCase().includes('принят') || statusText.toLowerCase().includes('accepted')) {
+          statusCode = 'accepted';
+        } else if (statusText.toLowerCase().includes('проверяется') || statusText.toLowerCase().includes('checking')) {
+          statusCode = 'checking';
+        } else if (statusText.toLowerCase().includes('отправлен') || statusText.toLowerCase().includes('submitted')) {
+          statusCode = 'submitted';
+        } else if (statusText.toLowerCase().includes('не отправлен') || statusText.toLowerCase().includes('not submitted')) {
+          statusCode = 'not_submitted';
+        }
+
+        // Обработка баллов
+        let achievedScore = null;
+        let maxScore = null;
+        let isEmpty = true;
+        
+        const scoreText = scoreElement?.textContent?.trim() || '';
+        if (scoreText && scoreText !== '―') {
+          const scoreMatch = scoreText.match(/(\d+)\s*\/\s*(\d+)/);
+          if (scoreMatch) {
+            achievedScore = parseInt(scoreMatch[1]);
+            maxScore = parseInt(scoreMatch[2]);
+            isEmpty = false;
+          }
+        }
+
+        // Получаем дату загрузки
+        let uploadDateText = '';
+        if (uploadDateElement) {
+          uploadDateText = uploadDateElement.textContent?.trim() || '';
+          console.log(`Дата загрузки для строки ${index}: "${uploadDateText}"`);
+        }
+
+        // Определяем тип задания из названия
+        let taskType = '';
+        const taskName = taskLink?.textContent?.trim() || '';
+        if (taskName.toLowerCase().includes('лаб')) {
+          taskType = 'Лабораторная работа';
+        } else if (taskName.toLowerCase().includes('практ')) {
+          taskType = 'Практическая работа';
+        } else if (taskName.toLowerCase().includes('дом')) {
+          taskType = 'Домашнее задание';
+        } else if (taskName.toLowerCase().includes('курс')) {
+          taskType = 'Курсовой проект (работа)';
+        }
+
+        const report = {
+          task: {
+            id: taskId,
+            number: numberElement?.textContent?.trim() ? parseInt(numberElement.textContent.trim()) : null,
+            name: taskName,
+            type: taskType,
+            link: taskLink?.href || ''
+          },
+          teacher: {
+            full_name: teacherLink?.textContent?.trim() || '',
+            link: teacherLink?.href || ''
+          },
+          load_date: {
+            date: null,
+            text: uploadDateText
+          },
+          score: {
+            achieved: achievedScore,
+            max: maxScore,
+            is_empty: isEmpty
+          },
+          status: {
+            code: statusCode,
+            text: statusText,
+            additional_text: ''
+          },
+          attachments: {
+            download_url: downloadButton?.href || '',
+            has_attachment: !!downloadButton
+          }
+        };
+        
+        console.log(`Отчет ${index}:`, {
+          id: report.task.id,
+          name: report.task.name,
+          status: report.status.text,
+          score: `${report.score.achieved}/${report.score.max}`,
+          upload_date: report.load_date.text,
+          has_attachment: report.attachments.has_attachment
+        });
+        
+        // Добавляем отчет если есть хотя бы название задания
+        if (report.task.name) {
+          reports.push(report);
+        }
+      }
     });
-  }
+    
+    return reports;
+  });
+}
 }

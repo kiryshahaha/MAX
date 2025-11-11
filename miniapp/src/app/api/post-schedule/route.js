@@ -1,8 +1,7 @@
-//api/post-schedule/route.js
+// app/api/post-schedule/route.js
 import { userService } from "@/services/user-service";
 import { scheduleService } from "@/services/schedule-service";
 import { logsService } from "@/services/logs-service";
-import { adminSupabase } from "../../../../lib/supabase-client";
 
 const PARSER_SERVICE_URL = process.env.PARSER_SERVICE_URL;
 
@@ -10,7 +9,7 @@ export async function POST(request) {
   let username;
   
   try {
-    const { username: reqUsername, password, year = 2025, week = 44 } = await request.json();
+    const { username: reqUsername, password, year = 2025, week = 45, saveToDatabase = false } = await request.json();
     username = reqUsername;
 
     if (!username || !password) {
@@ -20,7 +19,7 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    console.log('🔍 Получаем расписание от парсера для пользователя:', username, { year, week });
+    console.log('🔍 Получаем расписание от парсера для пользователя:', username, { year, week, saveToDatabase });
 
     const parserResponse = await fetch(`${PARSER_SERVICE_URL}/api/scrape/schedule`, {
       method: 'POST',
@@ -39,7 +38,7 @@ export async function POST(request) {
     console.log('📊 Результат от парсера:', { 
       success: result.success, 
       scheduleCount: result.schedule ? 
-        (result.schedule.regularClasses?.length + result.schedule.extraClasses?.length) : 0 
+        (result.schedule.days?.length + result.schedule.extraClasses?.length) : 0 
     });
 
     if (result.success && result.schedule) {
@@ -50,32 +49,46 @@ export async function POST(request) {
           userId: userResult.userId
         });
         
+        // Проверяем, является ли запрашиваемая неделя текущей
+        const currentDate = new Date();
+        const currentWeek = scheduleService.getWeekNumber(currentDate);
+        const currentYear = currentDate.getFullYear();
+        
+        // АВТОМАТИЧЕСКОЕ СОХРАНЕНИЕ: если запрашиваемая неделя совпадает с текущей
+        const shouldAutoSave = (parseInt(year) === currentYear && parseInt(week) === currentWeek);
+        const finalSaveToDatabase = saveToDatabase || shouldAutoSave;
+        
+        if (shouldAutoSave) {
+          console.log('🔄 АВТОСОХРАНЕНИЕ: запрашиваемая неделя совпадает с текущей:', { 
+            requestedWeek: week, 
+            currentWeek: currentWeek 
+          });
+        }
+        
+        // Очищаем устаревшие расписания (только today_schedule)
+        await scheduleService.cleanupOldSchedules(userResult.userId);
+        
         // Сохранение расписания в user_data
         const saveResult = await scheduleService.saveUserSchedule(
           userResult.userId, 
           result.schedule, 
-          result.year, 
-          result.week
+          'week',
+          { year: result.year, week: result.week },
+          finalSaveToDatabase
         );
-        console.log('💾 Результат сохранения расписания:', saveResult);
         
-        // Проверяем, что данные действительно сохранились
-        if (saveResult) {
-          console.log('✅ Расписание успешно сохранено в БД');
-          
-          // Дополнительная проверка: читаем обратно из БД
-          const { data: checkData, error: checkError } = await adminSupabase
-            .from('user_data')
-            .select('schedule, schedule_year, schedule_week, updated_at')
-            .eq('user_id', userResult.userId)
-            .single();
-            
-          if (checkError) {
-            console.error('❌ Ошибка проверки сохраненного расписания:', checkError);
-          } else {
-            console.log('✅ Проверка БД: сохранено расписание за', 
-              checkData.schedule_year, 'неделя', checkData.schedule_week);
-            console.log('✅ Время обновления:', checkData.updated_at);
+        if (saveResult.savedToDatabase) {
+          console.log('💾 Расписание сохранено в БД');
+          result.savedToDatabase = true;
+          if (shouldAutoSave) {
+            result.autoSaved = true;
+            result.message += ' (автосохранено как текущая неделя)';
+          }
+        } else {
+          console.log('💾 Расписание не сохранено в БД');
+          result.savedToDatabase = false;
+          if (saveResult.message) {
+            result.saveMessage = saveResult.message;
           }
         }
         
@@ -83,7 +96,7 @@ export async function POST(request) {
         await logsService.logLogin(
           username, 
           true, 
-          (result.schedule.regularClasses?.length + result.schedule.extraClasses?.length), 
+          (result.schedule.days?.length + result.schedule.extraClasses?.length), 
           'schedule'
         );
       } catch (dbError) {
