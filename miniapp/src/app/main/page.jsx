@@ -46,15 +46,30 @@ export default function MainPage() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      router.push('/');
-    } catch (error) {
-      console.error('Logout error:', error);
-      messageApi.error('Ошибка при выходе');
+const handleLogout = async () => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      const username = session.user.user_metadata?.original_username || session.user.user_metadata?.username;
+      
+      // Закрываем сессию парсера
+      if (username) {
+        await fetch('http://localhost:3001/api/logout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username }),
+        });
+      }
     }
-  };
+
+    // Выходим из Supabase
+    await supabase.auth.signOut();
+    router.push('/');
+  } catch (error) {
+    console.error('Logout error:', error);
+    messageApi.error('Ошибка при выходе');
+  }
+};
 
   return (
     <Panel mode="secondary" className="wrap">

@@ -28,7 +28,7 @@ export default function Auth() {
     }
 
     try {
-      // 1. Сначала проверяем валидность кредов через парсер
+      // 1. Проверяем креды через парсер
       const parserSuccess = await initializeParserSession(login, password);
       
       if (!parserSuccess) {
@@ -37,15 +37,13 @@ export default function Auth() {
         return;
       }
 
-      // 2. Если парсер успешно авторизовался - создаем/логиним пользователя в Supabase
       const email = isValidEmail(login) ? login : `${login}@guap-temp.com`;
-      
-      let user, session;
 
-      // Пытаемся войти (если пользователь уже существует)
+      // 2. Создаем/входим в Supabase с паролем от ГУАП
+      // (пароль будет храниться только в зашифрованном виде в refresh token)
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
-        password: password
+        password: password // Используем пароль ГУАП для Supabase
       });
 
       if (signInError) {
@@ -53,41 +51,24 @@ export default function Auth() {
         if (signInError.message?.includes('Invalid login credentials')) {
           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             email,
-            password: password,
+            password: password, // Тот же пароль ГУАП
             options: {
               data: {
                 original_username: login,
                 username: login,
                 last_login: new Date().toISOString(),
-                guap_password: password
               }
             }
           });
 
           if (signUpError) throw signUpError;
-          
-          user = signUpData.user;
-          session = signUpData.session;
         } else {
           throw signInError;
         }
-      } else {
-        // Успешный вход - обновляем метаданные
-        user = signInData.user;
-        session = signInData.session;
-        
-        await supabase.auth.updateUser({
-          data: {
-            original_username: login,
-            username: login,
-            last_login: new Date().toISOString(),
-            guap_password: password
-          }
-        });
       }
 
       // 3. Успешная авторизация
-      msg.success("Успешный вход в ЛК ГУАП!");
+      msg.success("Успешный вход!");
       router.push('/main');
 
     } catch (error) {

@@ -37,15 +37,18 @@ process.on('SIGTERM', async () => {
 app.post('/api/logout', async (req, res) => {
   try {
     const { username } = req.body;
-    const userId = username;
     
-    const session = SessionManager.sessions.get(userId);
-    if (session) {
-      await session.page.close();
-      SessionManager.sessions.delete(userId);
+    if (username) {
+      const session = SessionManager.sessions.get(username);
+      if (session) {
+        await session.page.close();
+        await session.browser.close();
+        SessionManager.sessions.delete(username);
+        console.log(`✅ Сессия парсера закрыта для: ${username}`);
+      }
     }
     
-    res.json({ success: true, message: '✅ Сессия завершена' });
+    res.json({ success: true, message: '✅ Сессии завершены' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

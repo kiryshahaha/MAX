@@ -23,16 +23,17 @@ export default function HomePage() {
 
       console.log('✅ Активная сессия Supabase найдена');
       
-      // Восстанавливаем сессию парсера
-      const parserSuccess = await restoreParserSession(session.user);
+      // Проверяем сессию парсера
+      const parserValid = await checkParserSession(session.user);
       
-      if (parserSuccess) {
-        console.log('✅ Все сессии восстановлены, переход в /main');
+      if (parserValid) {
+        console.log('✅ Сессия парсера активна, переход в /main');
         router.push('/main');
       } else {
-        console.log('❌ Сессия парсера не восстановлена, переход на авторизацию');
-        // Передаем флаг, что нужна переавторизация
-        router.push('/auth?reauth=true');
+        console.log('❌ Сессия парсера истекла, требуется переавторизация');
+        // Выходим из Supabase и переходим на авторизацию
+        await supabase.auth.signOut();
+        router.push('/auth?expired=true');
       }
 
     } catch (error) {
@@ -43,39 +44,24 @@ export default function HomePage() {
     }
   };
 
-  const restoreParserSession = async (user) => {
+  const checkParserSession = async (user) => {
     try {
       const username = user.user_metadata?.original_username || user.user_metadata?.username;
       
-      if (!username) {
-        console.warn('Недостаточно данных для восстановления сессии парсера');
-        return false;
-      }
+      if (!username) return false;
 
-      // Только проверяем существующую сессию
-      const checkResponse = await fetch('http://localhost:3001/api/scrape/check-session', {
+      const response = await fetch('http://localhost:3001/api/scrape/check-session', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),
       });
 
-      if (checkResponse.ok) {
-        const checkResult = await checkResponse.json();
-        
-        if (checkResult.sessionActive) {
-          console.log('✅ Активная сессия парсера найдена');
-          return true;
-        }
+      if (response.ok) {
+        const result = await response.json();
+        return result.sessionActive;
       }
-
-      // Если сессии нет - НЕ пытаемся создать новую, требуем переавторизацию
-      console.log('⌛ Сессия парсера истекла, требуется переавторизация');
       return false;
-
     } catch (error) {
-      console.warn('Ошибка проверки сессии парсера:', error.message);
       return false;
     }
   };
