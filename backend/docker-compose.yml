@@ -1,0 +1,47 @@
+version: "3.9"
+
+networks:
+  maxnet:
+
+services:
+  backend_main:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    networks:
+      - maxnet
+    env_file:
+      - ../backend/.env
+
+  backend_psychologist:
+    build:
+      context: ../backend/psychologist_service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    networks:
+      - maxnet
+    env_file:
+      - ../backend/psychologist_service/.env
+
+  frontend:
+    build:
+      context: ../miniapp
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    networks:
+      - maxnet
+    env_file:
+      - ../miniapp/.env
+
+  parser:
+    build:
+      context: ../parser
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    networks:
+      - maxnet
