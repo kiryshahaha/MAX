@@ -5,14 +5,14 @@ router = APIRouter(prefix="/profile", tags=["Profile"])
 
 @router.get("/")
 async def get_profile(
-    email: str = Query(..., description="Email пользователя"),
+    uid: str = Query(..., description="UID пользователя"),
     db = Depends(get_supabase_client)
 ):
-    """Получение профиля пользователя по email"""
-    profile = db.get_profile_by_email(email) or {}  # Если None, возвращаем пустой словарь
+    """Получение профиля пользователя по UID"""
+    profile = db.get_profile_by_uid(uid)
     
     return {
         "success": True,
         "profile": profile,
-        "user_email": email
+        "uid": uid
     }

@@ -6,15 +6,16 @@ def get_supabase_client():
     return supabase_client
 
 async def get_current_user_data(
-    email: str = Query(..., description="Email пользователя"),
+    uid: str = Query(..., description="UID пользователя из Authentication"),
     db = Depends(get_supabase_client)
 ):
-    """Dependency для получения данных текущего пользователя по email"""
-    if not email:
-        raise HTTPException(status_code=400, detail="Email is required")
+    """Dependency для получения данных текущего пользователя по UID"""
+    if not uid:
+        raise HTTPException(status_code=400, detail="UID is required")
     
-    user_data = db.get_user_full_data(email)
-    if not user_data:
-        raise HTTPException(status_code=404, detail="User not found")
+    # Проверяем, что пользователь существует в Authentication
+    user = db.get_user_by_uid(uid)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found in Authentication")
     
-    return user_data
+    return {"uid": uid, "user": user}
