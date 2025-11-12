@@ -8,6 +8,7 @@ export class SessionManager {
 
   // Создание новой сессии с авторизацией в ГУАП
   static async createSession(username, password) {
+    let browser;
     try {
       // Закрываем старую сессию если есть
       const existingSession = this.sessions.get(username);
@@ -192,4 +193,45 @@ export class SessionManager {
       expired: this.sessions.size - activeSessions
     };
   }
+
+  static async debugSession(username) {
+  const session = this.sessions.get(username);
+  if (!session) {
+    console.log('🔍 СЕССИЯ: не найдена');
+    return false;
+  }
+
+  console.log('🔍 ДЕБАГ СЕССИИ:', {
+    username,
+    createdAt: new Date(session.createdAt).toISOString(),
+    lastActivity: new Date(session.lastActivity).toISOString(),
+    age: Date.now() - session.createdAt,
+    isValid: this.isSessionValid(session),
+    pageUrl: session.page.url(),
+    browserConnected: !session.browser.process()?.killed
+  });
+
+  try {
+    // Проверяем что страница жива
+    const currentUrl = session.page.url();
+    console.log('   - Текущий URL страницы:', currentUrl);
+    
+    // Проверяем наличие элементов ЛК ГУАП
+    const hasGuapElements = await session.page.evaluate(() => {
+      return {
+        hasNavigation: !!document.querySelector('[class*="navigation"]'),
+        hasUserMenu: !!document.querySelector('[class*="user"]'),
+        hasSchedule: !!document.querySelector('[href*="schedule"]'),
+        bodyText: document.body.innerText.slice(0, 200)
+      };
+    });
+    
+    console.log('   - Элементы ЛК:', hasGuapElements);
+    return true;
+    
+  } catch (error) {
+    console.log('   - Ошибка проверки сессии:', error.message);
+    return false;
+  }
+}
 }

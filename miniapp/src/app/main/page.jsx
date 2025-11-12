@@ -10,7 +10,8 @@ import {
   Dot, 
   EllipsisText, 
   Flex, 
-  Panel 
+  Panel, 
+  Spinner
 } from "@maxhub/max-ui";
 import { Badge, Divider, Steps, Tag, message } from "antd";
 import { clientSupabase as supabase } from "../../../lib/supabase-client";
@@ -22,6 +23,7 @@ export default function MainPage() {
   const [scheduleLoading, setScheduleLoading] = useState(false);
   const router = useRouter();
   const [messageApi, contextHolder] = message.useMessage();
+  const [fetchLock, setFetchLock] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -51,6 +53,31 @@ const checkAuth = async () => {
   }
 };
 
+  const calculateActivePairProgress = (schedule) => {
+  if (!schedule || !schedule.schedule) return undefined;
+
+  const now = new Date();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  for (const classItem of schedule.schedule) {
+    if (classItem.timeRange) {
+      const [startTime, endTime] = classItem.timeRange.split('-');
+      const [startHour, startMinute] = startTime.split(':').map(Number);
+      const [endHour, endMinute] = endTime.split(':').map(Number);
+      
+      const startMinutes = startHour * 60 + startMinute;
+      const endMinutes = endHour * 60 + endMinute;
+      
+      if (currentTime >= startMinutes && currentTime <= endMinutes) {
+        const totalDuration = endMinutes - startMinutes;
+        const elapsed = currentTime - startMinutes;
+        return Math.min(Math.round((elapsed / totalDuration) * 100), 100);
+      }
+    }
+  }
+  
+  return undefined; // нет активной пары
+};
 
 const fetchTodaySchedule = async (userId) => {
   try {
@@ -104,7 +131,14 @@ const fetchTodaySchedule = async (userId) => {
 };
 
  const fetchFromParser = async (userId, currentDate) => {
+
+    if (fetchLock) {
+    console.log('⏳ Запрос уже выполняется, ждем...');
+    return;
+  }
+
   try {
+setFetchLock(true);
     // Получаем актуальные данные пользователя из сессии
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -112,22 +146,31 @@ const fetchTodaySchedule = async (userId) => {
       return;
     }
 
-    const username = session.user.user_metadata?.original_username || session.user.user_metadata?.username;
+    const guapUsername = session.user.user_metadata?.guap_username || 
+                        session.user.user_metadata?.original_username || 
+                        session.user.user_metadata?.username;
     const password = localStorage.getItem('guap_password');
 
     console.log('🔐 Данные для парсера:', { 
-      username, 
+      guapUsername, 
       passwordExists: !!password,
       userId 
     });
 
-    if (!username || !password) {
-      console.error('❌ Отсутствуют данные для авторизации:', { username, passwordExists: !!password });
+    // ИСПРАВЛЕНИЕ: используем guapUsername вместо username
+    if (!guapUsername || !password) {
+      console.error('❌ Отсутствуют данные для авторизации:', { 
+        guapUsername, 
+        passwordExists: !!password 
+      });
       messageApi.error('Данные для авторизации не найдены');
       return;
     }
 
-    console.log('🚀 Отправляем запрос к парсеру:', { username, date: currentDate });
+    console.log('🚀 Отправляем запрос к парсеру:', { 
+      username: guapUsername, // ИСПРАВЛЕНИЕ: используем guapUsername
+      date: currentDate 
+    });
 
     const parserResponse = await fetch('/api/post-daily-schedule', {
       method: 'POST',
@@ -135,7 +178,7 @@ const fetchTodaySchedule = async (userId) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        username,
+        username: guapUsername, // ИСПРАВЛЕНИЕ: используем guapUsername
         password,
         date: currentDate,
         saveToDatabase: true
@@ -169,6 +212,8 @@ const fetchTodaySchedule = async (userId) => {
   } catch (error) {
     console.error('❌ Ошибка парсера:', error);
     messageApi.error('Ошибка обновления расписания');
+  } finally {
+    setFetchLock(false);
   }
 };
 
@@ -196,15 +241,44 @@ const fetchTodaySchedule = async (userId) => {
     }
   };
 
-  const formatScheduleForSteps = (schedule) => {
+const formatScheduleForSteps = (schedule) => {
   if (!schedule || !schedule.schedule || schedule.schedule.length === 0) return [];
 
-  return schedule.schedule.map((classItem, index) => ({
-    title: classItem.subject || 'Не указано',
-    description: `${classItem.timeRange || ''}${classItem.building ? `, ${classItem.building}` : ''}${classItem.location ? `, ${classItem.location}` : ''}`,
-    subTitle: classItem.type || '',
-    status: "wait"
-  }));
+  const now = new Date();
+  const currentTime = now.getHours() * 60 + now.getMinutes();
+
+  return schedule.schedule.map((classItem, index) => {
+    let status = "wait";
+    let percent = undefined;
+
+    if (classItem.timeRange) {
+      const [startTime, endTime] = classItem.timeRange.split('-');
+      const [startHour, startMinute] = startTime.split(':').map(Number);
+      const [endHour, endMinute] = endTime.split(':').map(Number);
+      
+      const startMinutes = startHour * 60 + startMinute;
+      const endMinutes = endHour * 60 + endMinute;
+      
+      if (currentTime < startMinutes) {
+        status = "wait";
+      } else if (currentTime >= startMinutes && currentTime <= endMinutes) {
+        status = "process";
+        const totalDuration = endMinutes - startMinutes;
+        const elapsed = currentTime - startMinutes;
+        percent = Math.min(Math.round((elapsed / totalDuration) * 100), 100);
+      } else {
+        status = "finish";
+      }
+    }
+
+    return {
+      title: classItem.subject || 'Не указано',
+      description: `${classItem.timeRange || ''}${classItem.building ? `, ${classItem.building}` : ''}${classItem.location ? `, ${classItem.location}` : ''}`,
+      subTitle: classItem.pairNumber || '',
+      status,
+      percent // передаем percent в каждый step
+    };
+  });
 };
 
   return (
@@ -230,12 +304,16 @@ const fetchTodaySchedule = async (userId) => {
             }
           >
             {scheduleLoading ? (
-              <CellSimple>Загрузка расписания...</CellSimple>
+              <CellSimple><Spinner /></CellSimple>
             ) : todaySchedule && todaySchedule.schedule.length > 0 ? (
-              <CellSimple showChevron>
+              <CellSimple
+              showChevron
+              >
                 <Steps
                   direction="vertical"
                   items={formatScheduleForSteps(todaySchedule)}
+                  percent={calculateActivePairProgress(todaySchedule)}
+                  
                 />
               </CellSimple>
             ) : (

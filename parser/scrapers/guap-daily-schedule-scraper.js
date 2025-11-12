@@ -1,25 +1,44 @@
 // parser/scrapers/guap-daily-schedule-scraper.js
 import { BaseScraper } from './base-scraper.js';
 import { GuapAuthStrategy } from '../auth/strategies/guap-auth.js';
+import { SessionManager } from '../core/session-manager.js'; 
 
 export class GuapDailyScheduleScraper extends BaseScraper {
   constructor() {
     super();
-    this.authStrategy = GuapAuthStrategy;
   }
 
-  async scrapeDailySchedule(credentials, date) {
+   async scrapeDailySchedule(credentials, date) {
+    console.log('🎯 НАЧАЛО ПАРСИНГА РАСПИСАНИЯ НА ДЕНЬ');
+    console.log('📅 Дата:', date);
+    console.log('👤 Пользователь:', credentials.username);
+    
     let page;
     
     try {
       await this.validateCredentials(credentials);
+      
+      // ДЕБАГ СЕССИИ ПЕРЕД ПОЛУЧЕНИЕМ СТРАНИЦЫ
+      const userId = this.getUserId(credentials);
+      console.log('🔍 Проверка сессии для пользователя:', userId);
+      await SessionManager.debugSession(userId);
+      
       page = await this.getAuthenticatedPage(credentials);
+      console.log('✅ Аутентифицированная страница получена');
 
       // Переход к расписанию на день
+      console.log('🧭 ПЕРЕХОД К РАСПИСАНИЮ...');
       await this.navigateToDailySchedule(page, date);
       
       // Парсинг расписания
+      console.log('📊 ПАРСИНГ РАСПИСАНИЯ...');
       const scheduleData = await this.parseDailySchedule(page);
+      
+      console.log('✅ ПАРСИНГ ЗАВЕРШЕН:', {
+        success: true,
+        scheduleCount: scheduleData.length,
+        date: date
+      });
       
       return {
         success: true,
@@ -30,29 +49,58 @@ export class GuapDailyScheduleScraper extends BaseScraper {
       };
 
     } catch (error) {
+      console.error('💥 ОШИБКА ПАРСИНГА:', error);
+      
       if (page) {
+        console.log('🔄 Инвалидация сессии из-за ошибки...');
         await this.invalidateSession(credentials);
       }
+      
       throw error;
     }
   }
 
-  async navigateToDailySchedule(page, date) {
-    console.log(`Переходим на страницу расписания за ${date}...`);
+async navigateToDailySchedule(page, date) {
+    console.log(`🧭 ПЕРЕХОД К РАСПИСАНИЮ ЗА ${date}...`);
     
     const scheduleUrl = `https://pro.guap.ru/inside/students/classes/schedule/day/${date}`;
+    console.log('   - URL:', scheduleUrl);
     
-    await page.goto(scheduleUrl, { 
-      waitUntil: 'networkidle2', 
-      timeout: 30000 
-    });
-    
-    // Более надежная проверка загрузки
-    await page.waitForFunction(() => {
-      const table = document.querySelector('table.table-bordered');
-      const noSchedule = document.querySelector('.alert.alert-info');
-      return table !== null || noSchedule !== null;
-    }, { timeout: 10000 });
+    try {
+      await page.goto(scheduleUrl, { 
+        waitUntil: 'networkidle2', 
+        timeout: 30000 
+      });
+      
+      console.log('✅ Страница расписания загружена. URL:', page.url());
+
+      // Более надежная проверка загрузки с логированием
+      console.log('⏳ Ожидание элементов расписания...');
+      await page.waitForFunction(() => {
+        const table = document.querySelector('table.table-bordered');
+        const noSchedule = document.querySelector('.alert.alert-info');
+        const loading = document.querySelector('[class*="loading"], [class*="spinner"]');
+        
+        console.log('   - Элементы на странице:', {
+          table: !!table,
+          noSchedule: !!noSchedule,
+          loading: !!loading
+        });
+        
+        return table !== null || noSchedule !== null || !loading;
+      }, { timeout: 15000, polling: 500 });
+      
+      console.log('✅ Элементы расписания загружены');
+      
+    } catch (error) {
+      console.error('❌ Ошибка загрузки страницы расписания:', error);
+      
+      // Проверяем что вообще на странице
+      const pageContent = await page.content();
+      console.log('🔍 Содержимое страницы (первые 500 символов):', pageContent.slice(0, 500));
+      
+      throw error;
+    }
   }
 
   async parseDailySchedule(page) {
