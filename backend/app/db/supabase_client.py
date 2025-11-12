@@ -67,57 +67,47 @@ class SupabaseClient:
         return {}
 
     def get_today_schedule_by_uid(self, uid: str):
-        """Получаем расписание на сегодня из колонки today_schedule"""
-        user_data = self.get_user_data_by_uid(uid)
+            """Получаем расписание на сегодня из колонки today_schedule с метаданными внутри JSON"""
+            user_data = self.get_user_data_by_uid(uid)
     
-        # Базовый результат
-        result = {
-            "date": datetime.now().strftime("%Y-%m-%d"),
-            "date_dd_mm": datetime.now().strftime("%d.%m"),
-            "day_name": ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][datetime.now().weekday()],
-            "day_of_week": datetime.now().weekday(),
-            "schedule": [],
-            "has_schedule": False  # Флаг наличия расписания
-        }
+            # Базовый результат на случай отсутствия данных
+            base_result = {
+                "date": datetime.now().strftime("%Y-%m-%d"),
+                "date_dd_mm": datetime.now().strftime("%d.%m"),
+                "day_name": ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][datetime.now().weekday()],
+                "day_of_week": datetime.now().weekday(),
+                "schedule": [],
+                "has_schedule": False
+            }
     
-        if user_data and 'today_schedule' in user_data:
-            today_schedule = user_data['today_schedule']
+            if user_data and 'today_schedule' in user_data:
+                today_schedule = user_data['today_schedule']
         
-            # Проверяем, что today_schedule не None и не null
-            if today_schedule is not None:
-                if isinstance(today_schedule, list):
-                    # Форматируем занятия для единообразия
-                    formatted_classes = []
-                    for class_item in today_schedule:
-                        if isinstance(class_item, dict):
-                            formatted_class = {
-                                "type": class_item.get('type', ''),
-                                "group": class_item.get('group', ''),
-                                "subject": class_item.get('subject', ''),
-                                "teacher": class_item.get('teacher', ''),
-                                "building": class_item.get('building', ''),
-                                "location": class_item.get('location', ''),
-                                "timeRange": class_item.get('timeRange', ''),
-                                "pairNumber": class_item.get('pairNumber', ''),
-                                "teacherInfo": class_item.get('teacherInfo', '')
-                            }
-                            formatted_classes.append(formatted_class)
+                # Проверяем, что today_schedule не None и содержит данные
+                if today_schedule is not None and isinstance(today_schedule, dict):
+                    # Извлекаем метаданные из today_schedule
+                    metadata = today_schedule.get('metadata', {})
                 
-                    result["schedule"] = formatted_classes
-                    result["has_schedule"] = len(formatted_classes) > 0  # True если есть занятия
-                    print(f"✅ Found {len(formatted_classes)} classes in today_schedule for UID: {uid}")
+                    print(f"📅 Метаданные из today_schedule: неделя {metadata.get('week_number')}, четная: {metadata.get('is_even_week')}")
+                
+                    # Форматируем результат с метаданными
+                    result = {
+                        "date": today_schedule.get('date', base_result['date']),
+                        "date_dd_mm": today_schedule.get('date_dd_mm', base_result['date_dd_mm']),
+                        "day_name": today_schedule.get('day_name', base_result['day_name']),
+                        "day_of_week": today_schedule.get('day_of_week', base_result['day_of_week']),
+                        "schedule": today_schedule.get('schedule', []),
+                        "has_schedule": today_schedule.get('has_schedule', False),
+                        "metadata": metadata
+                    }
+                
+                    print(f"✅ Found today_schedule with {len(result['schedule'])} classes for UID: {uid}")
                     return result
                 else:
-                    print(f"❌ today_schedule is not a list for UID: {uid}")
-            else:
-                print(f"⚠️ today_schedule is None/null for UID: {uid}")
-                # Возвращаем результат с флагом False
-                return result
+                    print(f"⚠️ today_schedule is None or not a dict for UID: {uid}")
     
-        print(f"❌ No valid today_schedule found for UID: {uid}")
-        # Если today_schedule нет, используем старую логику из week_schedule
-        schedule = self.get_schedule_by_uid(uid)
-        return self._extract_day_schedule(schedule, 0) # Сегодня    
+            print(f"❌ No valid today_schedule found for UID: {uid}")
+            return base_result
 
     def get_tomorrow_schedule_by_uid(self, uid: str):
         """Получаем расписание на завтра из week_schedule"""

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -27,9 +27,18 @@ export default function MainPage() {
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [tasksFetchLock, setTasksFetchLock] = useState(false);
+  //   const [reports, setReports] = useState([]);
+  // const [reportsLoading, setReportsLoading] = useState(false);
+  // const [reportsFetchLock, setReportsFetchLock] = useState(false);
+
+  const initialLoadRef = useRef(true);
 
   useEffect(() => {
-    checkAuth();
+    // Запускаем только при первом монтировании
+    if (initialLoadRef.current) {
+      initialLoadRef.current = false;
+      checkAuth();
+    }
   }, []);
 
   const checkAuth = async () => {
@@ -43,7 +52,13 @@ export default function MainPage() {
       }
 
       setUser(session.user);
+
+      console.log('🔄 Последовательная загрузка данных...');
+
+      // 1. Сначала расписание
       await fetchTodaySchedule(session.user.id);
+
+      // 2. Затем задачи
       await fetchTasks(session.user.id);
 
     } catch (error) {
@@ -54,6 +69,115 @@ export default function MainPage() {
       setLoading(false);
     }
   };
+
+  // Функция для обновления отчетов
+  // const fetchReports = async (userId, forceUpdate = false) => {
+  //   if (reportsLoading) {
+  //     console.log('⏳ Запрос отчетов уже выполняется...');
+  //     return;
+  //   }
+
+  //   try {
+  //     setReportsLoading(true);
+  //     console.log('📋 Запрашиваем отчеты для пользователя:', userId, { forceUpdate });
+
+  //     if (forceUpdate) {
+  //       console.log('🔄 Принудительное обновление через парсер');
+  //       await updateReportsFromParser(userId);
+  //       return;
+  //     }
+
+  //     const reportsResponse = await fetch(`/api/reports?uid=${userId}`);
+
+  //     if (!reportsResponse.ok) {
+  //       throw new Error(`Reports API error: ${reportsResponse.status}`);
+  //     }
+
+  //     const reportsData = await reportsResponse.json();
+  //     console.log('📊 Ответ от reports API:', reportsData);
+
+  //     if (reportsData.success && reportsData.reports && reportsData.reports_count > 0) {
+  //       console.log('✅ Используем отчеты из бэкенда');
+  //       setReports(reportsData.reports);
+  //     } else {
+  //       console.log('🔄 Отчеты не найдены в БД, обновляем через парсер');
+  //       await updateReportsFromParser(userId);
+  //     }
+
+  //   } catch (error) {
+  //     console.error('❌ Ошибка получения отчетов:', error);
+  //     messageApi.error('Ошибка загрузки отчетов');
+  //   } finally {
+  //     setReportsLoading(false);
+  //   }
+  // };
+
+  // const updateReportsFromParser = async (userId) => {
+  //   if (reportsFetchLock) {
+  //     console.log('⏳ Запрос отчетов уже выполняется, ждем...');
+  //     return;
+  //   }
+
+  //   try {
+  //     setReportsFetchLock(true);
+
+  //     const { data: { session } } = await supabase.auth.getSession();
+  //     if (!session) {
+  //       messageApi.error('Сессия не найдена');
+  //       return;
+  //     }
+
+  //     const guapUsername = session.user.user_metadata?.guap_username ||
+  //       session.user.user_metadata?.original_username ||
+  //       session.user.user_metadata?.username;
+  //     const password = localStorage.getItem('guap_password');
+
+  //     console.log('🔐 Данные для обновления отчетов:', {
+  //       guapUsername,
+  //       passwordExists: !!password
+  //     });
+
+  //     if (!guapUsername || !password) {
+  //       console.error('❌ Отсутствуют данные для авторизации');
+  //       messageApi.error('Данные для авторизации не найдены');
+  //       return;
+  //     }
+
+  //     console.log('🚀 Отправляем запрос на обновление отчетов');
+  //     const updateResponse = await fetch('/api/reports/update', {
+  //       method: 'POST',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: JSON.stringify({
+  //         username: guapUsername,
+  //         password,
+  //         uid: userId
+  //       }),
+  //     });
+
+  //     if (!updateResponse.ok) {
+  //       const errorText = await updateResponse.text();
+  //       throw new Error(`Update reports API error: ${updateResponse.status} - ${errorText}`);
+  //     }
+
+  //     const updateData = await updateResponse.json();
+  //     console.log('📊 Ответ от update reports API:', updateData);
+
+  //     if (updateData.success) {
+  //       setReports(updateData.reports || []);
+  //       messageApi.success('Отчеты обновлены');
+  //     } else {
+  //       messageApi.error(updateData.message || 'Ошибка обновления отчетов');
+  //     }
+
+  //   } catch (error) {
+  //     console.error('❌ Ошибка обновления отчетов:', error);
+  //     messageApi.error('Ошибка обновления отчетов');
+  //   } finally {
+  //     setReportsFetchLock(false);
+  //   }
+  // };
 
   const fetchTodaySchedule = async (userId) => {
     if (scheduleLoading) {
@@ -77,16 +201,22 @@ export default function MainPage() {
 
       // 2. ОБНОВЛЕННАЯ ЛОГИКА: если расписание не найдено ИЛИ флаг has_schedule = false
       const shouldUpdateFromParser = !scheduleData.success ||
+        scheduleData.needsUpdate ||
         (scheduleData.schedule && scheduleData.schedule.has_schedule === false);
 
       if (scheduleData.success && scheduleData.schedule && !shouldUpdateFromParser) {
         console.log('✅ Используем актуальное расписание из бэкенда');
         console.log('   - Флаг has_schedule:', scheduleData.schedule.has_schedule);
+        console.log('   - Дата актуальна:', scheduleData.schedule.date);
         setTodaySchedule(scheduleData.schedule);
       } else {
-        // 3. Если расписания нет или флаг has_schedule = false - обновляем через парсер
-        console.log('🔄 Расписание не найдено или флаг has_schedule = false, обновляем через парсер');
-        console.log('   - Причина:', !scheduleData.success ? 'API не успешно' : 'has_schedule = false');
+        // 3. Если расписания нет, устарело или дата не совпадает - обновляем через парсер
+        console.log('🔄 Расписание не найдено, устарело или дата не совпадает, обновляем через парсер');
+        console.log('   - Причина:',
+          !scheduleData.success ? 'API не успешно' :
+            scheduleData.needsUpdate ? 'Требуется обновление' :
+              scheduleData.reason === 'date_mismatch' ? 'Дата не совпадает' :
+                'has_schedule = false');
         await updateScheduleFromParser(userId);
       }
 
@@ -118,7 +248,8 @@ export default function MainPage() {
         session.user.user_metadata?.original_username ||
         session.user.user_metadata?.username;
       const password = localStorage.getItem('guap_password');
-      const currentDate = new Date().toISOString().split('T')[0];
+      const currentDate = new Date();
+      const currentDateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
 
       console.log('🔐 Данные для обновления расписания:', {
         guapUsername,
@@ -142,7 +273,7 @@ export default function MainPage() {
         body: JSON.stringify({
           username: guapUsername,
           password,
-          date: currentDate
+          date: currentDateString  // Используем исправленную дату
         }),
       });
 
@@ -363,7 +494,13 @@ export default function MainPage() {
       .filter(task => {
         // Фильтруем задачи с валидными дедлайнами (не "Спи спокойно")
         const deadlineText = task.deadline?.text;
-        return deadlineText && deadlineText !== 'Спи спокойно';
+        const hasValidDeadline = deadlineText && deadlineText !== 'Спи спокойно';
+
+        // ИСКЛЮЧАЕМ задачи со статусом "принят" или "ожидает проверки"
+        const status = task.status?.text?.toLowerCase();
+        const hasExcludingStatus = status === 'принят' || status === 'ожидает проверки';
+
+        return hasValidDeadline && !hasExcludingStatus;
       })
       .sort((a, b) => {
         // Сортируем по дате дедлайна
@@ -371,7 +508,7 @@ export default function MainPage() {
         const dateB = parseDate(b.deadline.text);
         return dateA - dateB;
       })
-      .slice(0, 25); // Берем 5 ближайших дедлайнов
+      .slice(0, 25); // Берем ближайшие дедлайны
   };
 
   // Функция для парсинга даты из текста
@@ -383,6 +520,19 @@ export default function MainPage() {
       return new Date(year, month - 1, day).getTime();
     } catch (error) {
       return Infinity;
+    }
+  };
+
+
+
+  // Обновите обработчик кнопки "Обновить" для обновления и задач, и отчетов
+  const handleUpdateDeadlines = async () => {
+    if (tasksLoading) return;
+
+    try {
+      await fetchTasks(user?.id, true);
+    } catch (error) {
+      console.error('Ошибка при обновлении дедлайнов:', error);
     }
   };
 
@@ -404,6 +554,8 @@ export default function MainPage() {
       return 'default';
     }
   };
+
+
 
   const formatScheduleForSteps = (schedule) => {
     if (!schedule || !schedule.schedule || schedule.schedule.length === 0) return [];
@@ -520,11 +672,11 @@ export default function MainPage() {
             mode="island"
             header={
               <CellHeader titleStyle="caps">
-                <Flex direction="row" align="center" justify="space-between" >
+                <Flex direction="row" align="center" justify="space-between">
                   <span>Ближайшие дедлайны</span>
                   <Button
                     type="link"
-                    onClick={() => !tasksLoading && fetchTasks(user?.id, true)}
+                    onClick={handleUpdateDeadlines}
                     disabled={tasksLoading}
                     style={{ fontSize: '12px' }}
                   >
@@ -554,7 +706,7 @@ export default function MainPage() {
                 Нет ближайших дедлайнов
                 <Button
                   type="link"
-                  onClick={() => !tasksLoading && fetchTasks(user?.id)}
+                  onClick={handleUpdateDeadlines}
                   style={{ marginTop: '10px' }}
                   disabled={tasksLoading}
                 >

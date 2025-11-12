@@ -10,10 +10,16 @@ export const scheduleService = {
       console.log('📅 Тип расписания:', scheduleType);
       console.log('📊 Количество занятий:', scheduleData?.length || 0);
 
-      // Убираем проверку на shouldSave - всегда сохраняем
-      console.log('💾 Автоматическое сохранение в БД при обращении к парсеру');
-
+      // ФИКС: Используем локальную дату вместо UTC
       const currentDate = new Date();
+      const todayString = this.formatDateToYYYYMMDD(currentDate); // Исправленная функция
+      const weekNumber = this.getWeekNumber(currentDate);
+      const isEvenWeek = this.isEvenWeek(weekNumber);
+
+      console.log('📅 Локальная дата:', todayString);
+      console.log('🔢 Номер недели:', weekNumber);
+      console.log('⚖️ Четность недели:', isEvenWeek ? 'Четная' : 'Нечетная');
+
       const updateData = {
         schedule_updated_at: currentDate.toISOString()
       };
@@ -26,15 +32,33 @@ export const scheduleService = {
         console.log('✅ Сохраняем расписание для текущей недели:', currentWeek);
 
         updateData.week_schedule = scheduleData;
-        // Не сохраняем week_number и week_year - используем системные даты
 
       } else if (scheduleType === 'today') {
-        const todayString = currentDate.toISOString().split('T')[0];
-
         console.log('✅ Сохраняем расписание на сегодня:', todayString);
 
-        updateData.today_schedule = scheduleData;
-        // Не сохраняем today_date - используем системную дату
+        // ФИКС: Правильно определяем день недели и дату в формате DD.MM
+        const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+        const dayName = dayNames[currentDate.getDay()];
+        const date_dd_mm = `${String(currentDate.getDate()).padStart(2, '0')}.${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+
+        // Создаем объект расписания с метаданными внутри
+        const todayScheduleWithMetadata = {
+          date: todayString, // Теперь это правильная локальная дата
+          date_dd_mm: date_dd_mm,
+          day_name: dayName,
+          day_of_week: currentDate.getDay(),
+          schedule: scheduleData || [],
+          has_schedule: (scheduleData && scheduleData.length > 0) || false,
+          metadata: {
+            system_date: todayString,
+            week_number: weekNumber,
+            is_even_week: isEvenWeek,
+            schedule_updated_at: currentDate.toISOString()
+          }
+        };
+
+        updateData.today_schedule = todayScheduleWithMetadata;
+        updateData.today_date = todayString;
       }
 
       console.log('🔍 Проверяем существующую запись...');
@@ -85,8 +109,22 @@ export const scheduleService = {
         console.log('✅ Создана запись с расписанием для пользователя', userId);
       }
 
-      console.log('💾 Результат сохранения расписания:', result);
-      return { savedToDatabase: true, data: result };
+      console.log('💾 Результат сохранения расписания:', {
+        savedToDatabase: true,
+        systemDate: todayString,
+        weekNumber: weekNumber,
+        isEvenWeek: isEvenWeek
+      });
+      
+      return { 
+        savedToDatabase: true, 
+        data: result,
+        metadata: {
+          systemDate: todayString,
+          weekNumber: weekNumber,
+          isEvenWeek: isEvenWeek
+        }
+      };
 
     } catch (error) {
       console.error('❌ Ошибка сохранения расписания:', error);
@@ -96,13 +134,12 @@ export const scheduleService = {
 
   async getUserSchedule(userId, scheduleType) {
     try {
-
       const adminSupabase = getAdminSupabase();
 
       let selectField;
 
       if (scheduleType === 'today') {
-        selectField = 'today_schedule';
+        selectField = 'today_schedule, today_date';
       } else if (scheduleType === 'week') {
         selectField = 'week_schedule';
       } else {
@@ -122,10 +159,19 @@ export const scheduleService = {
 
       if (data) {
         console.log('📋 Расписание получено из БД');
+        
+        // Если это today_schedule и есть метаданные внутри
+        if (scheduleType === 'today' && data.today_schedule && data.today_schedule.metadata) {
+          console.log('📋 Метаданные из today_schedule:', {
+            systemDate: data.today_schedule.metadata.system_date,
+            weekNumber: data.today_schedule.metadata.week_number,
+            isEvenWeek: data.today_schedule.metadata.is_even_week
+          });
+        }
+        
         return data;
       }
 
-      // Если в БД нет данных
       console.log('📋 Расписание не найдено в БД');
       return null;
 
@@ -135,29 +181,34 @@ export const scheduleService = {
     }
   },
 
-  // Проверка актуальности расписания
+  // Проверка актуальности расписания с учетом метаданных внутри today_schedule
   isScheduleActual(scheduleType, scheduleData = null) {
     const currentDate = new Date();
+    const todayString = this.formatDateToYYYYMMDD(currentDate); // Исправленная функция
+
+    if (!scheduleData) return false;
 
     if (scheduleType === 'today') {
-      // Для расписания на день проверяем, что оно вообще есть
-      return scheduleData && scheduleData.today_schedule;
+      // Проверяем метаданные внутри today_schedule
+      if (scheduleData.today_schedule && scheduleData.today_schedule.metadata) {
+        const metadata = scheduleData.today_schedule.metadata;
+        return metadata.system_date === todayString;
+      }
+      return false;
     } else if (scheduleType === 'week') {
-      // Для недельного расписания проверяем, что оно есть
-      return scheduleData && scheduleData.week_schedule;
+      return scheduleData.week_schedule;
     }
 
     return false;
   },
 
-  // Очистка устаревших расписаний - УПРОЩЕННАЯ ВЕРСИЯ
+  // Очистка устаревших расписаний
   async cleanupOldSchedules(userId) {
     try {
-
       const adminSupabase = getAdminSupabase();
 
       const currentDate = new Date();
-      const todayString = currentDate.toISOString().split('T')[0];
+      const todayString = this.formatDateToYYYYMMDD(currentDate); // Исправленная функция
 
       // Получаем данные пользователя
       const { data: userData } = await adminSupabase
@@ -168,18 +219,18 @@ export const scheduleService = {
 
       if (userData) {
         const updateData = {};
-        const scheduleUpdated = userData.schedule_updated_at ? new Date(userData.schedule_updated_at) : null;
-
-        // Очищаем today_schedule если оно старше 1 дня
-        if (userData.today_schedule && scheduleUpdated) {
-          const daysDiff = (currentDate - scheduleUpdated) / (1000 * 60 * 60 * 24);
-          if (daysDiff > 1) {
+        
+        // Очищаем today_schedule если дата в метаданных не совпадает с текущей
+        if (userData.today_schedule && userData.today_schedule.metadata) {
+          if (userData.today_schedule.metadata.system_date !== todayString) {
             updateData.today_schedule = null;
+            updateData.today_date = null;
             console.log('🧹 Очищено устаревшее расписание на день');
           }
         }
 
         // Очищаем week_schedule если оно старше 1 недели
+        const scheduleUpdated = userData.schedule_updated_at ? new Date(userData.schedule_updated_at) : null;
         if (userData.week_schedule && scheduleUpdated) {
           const daysDiff = (currentDate - scheduleUpdated) / (1000 * 60 * 60 * 24);
           if (daysDiff > 7) {
@@ -200,6 +251,14 @@ export const scheduleService = {
     }
   },
 
+  // ФИКС: Новая функция для форматирования даты в YYYY-MM-DD в локальном времени
+  formatDateToYYYYMMDD(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  },
+
   // Функция для получения номера недели (ISO 8601)
   getWeekNumber(date) {
     const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -207,5 +266,10 @@ export const scheduleService = {
     d.setUTCDate(d.getUTCDate() + 4 - dayNum);
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  },
+
+  // Функция для определения четности недели
+  isEvenWeek(weekNumber) {
+    return weekNumber % 2 === 0;
   }
 };

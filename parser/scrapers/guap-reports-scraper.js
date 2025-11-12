@@ -10,12 +10,27 @@ export class GuapReportsScraper extends BaseScraper {
 
   async scrapeReports(credentials) {
     let page;
+    let shouldInvalidateSession = false;
     
     try {
       await this.validateCredentials(credentials);
+      
+      // Получаем страницу с сессией
       page = await this.getAuthenticatedPage(credentials);
+      
+      if (!page || page.isClosed()) {
+        throw new Error('Страница не доступна или закрыта');
+      }
 
-      // Переход к отчетам
+      // Проверяем, что мы еще на GUAP
+      const currentUrl = page.url();
+      if (!currentUrl.includes('guap.ru')) {
+        console.log('❌ Сессия утеряна, требуется повторная аутентификация');
+        shouldInvalidateSession = true;
+        throw new Error('Сессия утеряна');
+      }
+
+      // Переход к отчетам с улучшенной обработкой ошибок
       await this.navigateToReports(page);
       
       // Получаем общее количество отчетов
@@ -34,25 +49,114 @@ export class GuapReportsScraper extends BaseScraper {
       };
 
     } catch (error) {
-      if (page) {
+      console.error('❌ Ошибка при скрапинге отчетов:', error.message);
+      
+      if (shouldInvalidateSession || error.message.includes('detached') || error.message.includes('утеряна')) {
+        console.log('🗑️ Инвалидируем сессию из-за ошибки...');
         await this.invalidateSession(credentials);
       }
+      
+      throw new Error(`⚠️ Ошибка при выполнении скрипта: ${error.message}`);
+    }
+  }
+
+  async navigateToReports(page) {
+    console.log('🔄 Переходим на страницу отчетов...');
+    
+    try {
+      // Используем более надежный подход с проверкой состояния страницы
+      if (page.isClosed()) {
+        throw new Error('Страница закрыта');
+      }
+
+      // Проверяем текущий URL - если уже на странице отчетов, не переходим
+      const currentUrl = page.url();
+      if (currentUrl.includes('/reports')) {
+        console.log('✅ Уже на странице отчетов');
+        return;
+      }
+
+      // Переходим на страницу отчетов с увеличенным таймаутом
+      await page.goto('https://pro.guap.ru/inside/student/reports/', { 
+        waitUntil: 'domcontentloaded',
+        timeout: 45000 
+      });
+
+      console.log('✅ Успешно перешли на страницу отчетов');
+
+      // Ждем загрузки ключевых элементов
+      await this.waitForReportsPageLoad(page);
+
+    } catch (error) {
+      console.error('❌ Ошибка при переходе на страницу отчетов:', error.message);
+      
+      // Проверяем, не закрыта ли страница
+      if (page.isClosed()) {
+        throw new Error('Страница была закрыта во время навигации');
+      }
+      
+      // Проверяем состояние загрузки
+      const pageTitle = await page.title();
+      console.log('📄 Текущий заголовок страницы:', pageTitle);
+      
+      // Если страница загрузилась, но с ошибкой - проверяем контент
+      const hasContent = await page.evaluate(() => {
+        return document.body.textContent.length > 0;
+      });
+      
+      if (!hasContent) {
+        throw new Error('Страница загрузилась без контента');
+      }
+      
       throw error;
     }
   }
 
- async navigateToReports(page) {
-    console.log('Переходим на страницу отчетов...');
-    await page.goto('https://pro.guap.ru/inside/student/reports/', { 
-      waitUntil: 'networkidle2', 
-      timeout: 30000 
-    });
+  async waitForReportsPageLoad(page) {
+    console.log('⏳ Ожидаем загрузки страницы отчетов...');
     
-    // Ждем загрузки таблицы
-    await page.waitForFunction(() => {
-      const tables = document.querySelectorAll('table');
-      return tables.length > 0;
-    }, { timeout: 10000 });
+    // Ждем появления либо таблицы, либо сообщения об ошибке
+    try {
+      await page.waitForFunction(() => {
+        // Проверяем наличие таблицы
+        const tables = document.querySelectorAll('table');
+        const hasTable = tables.length > 0;
+        
+        // Проверяем наличие сообщения об ошибке или редиректа на логин
+        const bodyText = document.body.textContent;
+        const hasError = bodyText.includes('Ошибка') || 
+                        bodyText.includes('error') || 
+                        bodyText.includes('логин') ||
+                        bodyText.includes('login');
+        
+        return hasTable || hasError;
+      }, { timeout: 15000 });
+
+      // Проверяем, не попали ли мы на страницу логина
+      const currentUrl = page.url();
+      if (currentUrl.includes('login') || currentUrl.includes('auth')) {
+        throw new Error('Сессия истекла, требуется повторная аутентификация');
+      }
+
+      // Проверяем наличие таблицы
+      const hasTable = await page.evaluate(() => {
+        return document.querySelectorAll('table').length > 0;
+      });
+
+      if (!hasTable) {
+        console.log('⚠️ Таблица не найдена, проверяем контент страницы...');
+        const pageContent = await page.evaluate(() => document.body.textContent);
+        if (pageContent.includes('нет доступа') || pageContent.includes('не авторизован')) {
+          throw new Error('Нет доступа к странице отчетов');
+        }
+      }
+
+      console.log('✅ Страница отчетов успешно загружена');
+
+    } catch (error) {
+      console.error('❌ Ошибка при ожидании загрузки страницы:', error.message);
+      throw error;
+    }
   }
 
   async getTotalReportsCount(page) {
@@ -99,123 +203,150 @@ export class GuapReportsScraper extends BaseScraper {
   async parseReportsWithPagination(page, totalReports) {
     const allReports = [];
     let currentPage = 1;
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 2;
 
     console.log(`Начинаем парсинг отчетов с пагинацией. Всего отчетов: ${totalReports}`);
 
     while (true) {
-      console.log(`Парсим страницу ${currentPage}...`);
+      console.log(`📄 Парсим страницу ${currentPage}...`);
 
-      // Парсим отчеты на текущей странице
-      const pageReports = await this.parseReportsTable(page);
-      console.log(`На странице ${currentPage} найдено отчетов: ${pageReports.length}`);
-      
-      // Добавляем отчеты с проверкой на дубликаты
-      const newReports = pageReports.filter(report => 
-        !allReports.some(existingReport => 
-          existingReport.task?.id === report.task?.id
-        )
-      );
-      
-      allReports.push(...newReports);
-      console.log(`Новых отчетов: ${newReports.length}, всего: ${allReports.length}`);
-
-      // Проверяем, достигли ли общего количества отчетов
-      if (allReports.length >= totalReports) {
-        console.log(`Достигли общего количества отчетов (${allReports.length}/${totalReports}), завершаем парсинг`);
-        break;
-      }
-
-      // Пытаемся перейти на следующую страницу
-      const hasNextPage = await this.goToNextPage(page);
-      
-      if (!hasNextPage) {
-        console.log('Следующая страница не найдена, завершаем парсинг');
-        break;
-      }
-
-      currentPage++;
-      
-      // Ждем загрузки новой страницы
-      await this.waitForPageLoad(page);
-      
-      // Ждем загрузки таблицы на новой странице
       try {
-        await page.waitForFunction(() => {
-          const tables = document.querySelectorAll('table');
-          return tables.length > 0 && tables[0].querySelectorAll('tbody tr').length > 0;
-        }, { timeout: 10000 });
+        // Парсим отчеты на текущей странице
+        const pageReports = await this.parseReportsTable(page);
+        console.log(`На странице ${currentPage} найдено отчетов: ${pageReports.length}`);
+        
+        // Добавляем отчеты с проверкой на дубликаты
+        const newReports = pageReports.filter(report => 
+          !allReports.some(existingReport => 
+            existingReport.task?.id === report.task?.id
+          )
+        );
+        
+        allReports.push(...newReports);
+        console.log(`Новых отчетов: ${newReports.length}, всего: ${allReports.length}`);
+        
+        // Сбрасываем счетчик ошибок при успешном парсинге
+        consecutiveErrors = 0;
+
+        // Проверяем, достигли ли общего количества отчетов
+        if (allReports.length >= totalReports) {
+          console.log(`✅ Достигли общего количества отчетов (${allReports.length}/${totalReports}), завершаем парсинг`);
+          break;
+        }
+
+        // Пытаемся перейти на следующую страницу
+        const hasNextPage = await this.goToNextPage(page);
+        
+        if (!hasNextPage) {
+          console.log('⏹️ Следующая страница не найдена, завершаем парсинг');
+          break;
+        }
+
+        currentPage++;
+        
+        // Ждем загрузки новой страницы
+        await this.waitForPageLoad(page);
+
       } catch (error) {
-        console.log('Таблица не загрузилась после перехода, завершаем парсинг');
-        break;
+        console.error(`❌ Ошибка при парсинге страницы ${currentPage}:`, error.message);
+        consecutiveErrors++;
+        
+        if (consecutiveErrors >= maxConsecutiveErrors) {
+          console.log('🚫 Превышено максимальное количество ошибок подряд, завершаем парсинг');
+          break;
+        }
+        
+        // Пробуем продолжить со следующей страницы
+        console.log('🔄 Пробуем продолжить парсинг...');
+        const hasNextPage = await this.goToNextPage(page);
+        if (!hasNextPage) break;
+        
+        currentPage++;
+        await this.waitForPageLoad(page);
       }
     }
 
-    console.log(`Парсинг завершен. Всего собрано отчетов: ${allReports.length}`);
+    console.log(`✅ Парсинг завершен. Всего собрано отчетов: ${allReports.length}`);
     return allReports;
   }
 
   async goToNextPage(page) {
-    return await page.evaluate(() => {
-      // Ищем активную кнопку следующей страницы
-      const paginationItems = document.querySelectorAll('.page-item');
-      let nextButton = null;
-      
-      // Сначала ищем кнопку "Next" или стрелку
-      for (const item of paginationItems) {
-        const link = item.querySelector('.page-link');
-        if (!link) continue;
+    try {
+      return await page.evaluate(() => {
+        // Ищем активную кнопку следующей страницы
+        const paginationItems = document.querySelectorAll('.page-item');
+        let nextButton = null;
         
-        const text = link.textContent.trim();
-        const ariaLabel = link.getAttribute('aria-label') || '';
-        
-        const isNextButton = (
-          ariaLabel.toLowerCase().includes('next') || 
-          text === '›' || 
-          text === '»' || 
-          text.toLowerCase().includes('следующая')
-        );
-        
-        if (isNextButton && !item.classList.contains('disabled') && !item.classList.contains('active')) {
-          nextButton = link;
-          break;
+        // Сначала ищем кнопку "Next" или стрелку
+        for (const item of paginationItems) {
+          const link = item.querySelector('.page-link');
+          if (!link) continue;
+          
+          const text = link.textContent.trim();
+          const ariaLabel = link.getAttribute('aria-label') || '';
+          
+          const isNextButton = (
+            ariaLabel.toLowerCase().includes('next') || 
+            text === '›' || 
+            text === '»' || 
+            text.toLowerCase().includes('следующая')
+          );
+          
+          if (isNextButton && !item.classList.contains('disabled') && !item.classList.contains('active')) {
+            nextButton = link;
+            break;
+          }
         }
-      }
-      
-      // Если не нашли next, берем последнюю доступную страницу
-      if (!nextButton) {
-        const lastPageItem = document.querySelector('.page-item:last-child:not(.disabled)');
-        if (lastPageItem && !lastPageItem.classList.contains('active')) {
-          nextButton = lastPageItem.querySelector('.page-link');
+        
+        // Если не нашли next, берем последнюю доступную страницу
+        if (!nextButton) {
+          const lastPageItem = document.querySelector('.page-item:last-child:not(.disabled)');
+          if (lastPageItem && !lastPageItem.classList.contains('active')) {
+            nextButton = lastPageItem.querySelector('.page-link');
+          }
         }
-      }
-      
-      // Если нашли подходящую кнопку - кликаем
-      if (nextButton) {
-        nextButton.click();
-        return true;
-      }
-      
+        
+        // Если нашли подходящую кнопку - кликаем
+        if (nextButton) {
+          nextButton.click();
+          return true;
+        }
+        
+        return false;
+      });
+    } catch (error) {
+      console.error('❌ Ошибка при переходе на следующую страницу:', error.message);
       return false;
-    });
+    }
   }
 
   async waitForPageLoad(page) {
-    // Ждем либо по таймауту, либо пока не пропадет индикатор загрузки
-    if (page.waitForTimeout) {
-      await page.waitForTimeout(2000);
-    } else {
-      await new Promise(resolve => setTimeout(resolve, 2000));
+    console.log('⏳ Ожидаем загрузки страницы...');
+    
+    try {
+      // Ждем завершения сетевых запросов
+      await page.waitForNetworkIdle({ timeout: 10000 });
+    } catch (error) {
+      console.log('⚠️ Не дождались завершения сетевых запросов, продолжаем...');
     }
     
-    // Дополнительно ждем, пока не завершатся сетевые запросы
+    // Ждем загрузки таблицы
     try {
-      await page.waitForNetworkIdle({ timeout: 5000 });
+      await page.waitForFunction(() => {
+        const tables = document.querySelectorAll('table');
+        return tables.length > 0 && tables[0].querySelectorAll('tbody tr').length > 0;
+      }, { timeout: 10000 });
     } catch (error) {
-      console.log('Не дождались завершения сетевых запросов, продолжаем...');
+      console.log('⚠️ Таблица не загрузилась полностью, продолжаем...');
     }
+    
+    // Короткая пауза для стабилизации
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
-async parseReportsTable(page) {
+  // [parseReportsTable функция остается без изменений]
+  async parseReportsTable(page) {
   return await page.evaluate(() => {
     const reports = [];
     const tables = document.querySelectorAll('table');
@@ -395,4 +526,21 @@ async parseReportsTable(page) {
     return reports;
   });
 }
+
+
+  async invalidateSession(credentials) {
+    try {
+      const userId = this.getUserId(credentials);
+      const session = this.sessionManager.sessions.get(userId);
+      if (session && session.page && !session.page.isClosed()) {
+        await session.page.close();
+        this.sessionManager.sessions.delete(userId);
+        console.log('✅ Сессия успешно инвалидирована');
+      } else {
+        console.log('ℹ️ Сессия не найдена или уже закрыта');
+      }
+    } catch (error) {
+      console.error('❌ Ошибка при инвалидации сессии:', error);
+    }
+  }
 }
