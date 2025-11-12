@@ -24,6 +24,9 @@ export default function MainPage() {
   const router = useRouter();
   const [messageApi, contextHolder] = message.useMessage();
   const [fetchLock, setFetchLock] = useState(false);
+  const [tasks, setTasks] = useState([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [tasksFetchLock, setTasksFetchLock] = useState(false);
 
   useEffect(() => {
     checkAuth();
@@ -41,6 +44,7 @@ export default function MainPage() {
 
       setUser(session.user);
       await fetchTodaySchedule(session.user.id);
+      await fetchTasks(session.user.id);
 
     } catch (error) {
       console.error('Auth check error:', error);
@@ -237,6 +241,170 @@ export default function MainPage() {
     }
   };
 
+  // Добавьте функции для работы с задачами
+  const fetchTasks = async (userId, forceUpdate = false) => {
+    if (tasksLoading) {
+      console.log('⏳ Запрос задач уже выполняется...');
+      return;
+    }
+
+    try {
+      setTasksLoading(true);
+      console.log('📝 Запрашиваем задачи для пользователя:', userId, { forceUpdate });
+
+      // Если forceUpdate = true (нажата кнопка "Обновить") - всегда запускаем парсинг
+      if (forceUpdate) {
+        console.log('🔄 Принудительное обновление через парсер');
+        await updateTasksFromParser(userId);
+        return;
+      }
+
+      // Обычный запрос (при загрузке страницы) - проверяем БД
+      const tasksResponse = await fetch(`/api/tasks?uid=${userId}`);
+
+      if (!tasksResponse.ok) {
+        throw new Error(`Tasks API error: ${tasksResponse.status}`);
+      }
+
+      const tasksData = await tasksResponse.json();
+      console.log('📊 Ответ от tasks API:', tasksData);
+
+      // Если задачи найдены в БД - используем их
+      if (tasksData.success && tasksData.tasks && tasksData.tasks_count > 0) {
+        console.log('✅ Используем задачи из бэкенда');
+        setTasks(tasksData.tasks);
+      } else {
+        // Если задач нет в БД - обновляем через парсер
+        console.log('🔄 Задачи не найдены в БД, обновляем через парсер');
+        await updateTasksFromParser(userId);
+      }
+
+    } catch (error) {
+      console.error('❌ Ошибка получения задач:', error);
+      messageApi.error('Ошибка загрузки задач');
+    } finally {
+      setTasksLoading(false);
+    }
+  };
+  const updateTasksFromParser = async (userId) => {
+    if (tasksFetchLock) {
+      console.log('⏳ Запрос задач уже выполняется, ждем...');
+      return;
+    }
+
+    try {
+      setTasksFetchLock(true);
+
+      // Получаем актуальные данные пользователя
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        messageApi.error('Сессия не найдена');
+        return;
+      }
+
+      const guapUsername = session.user.user_metadata?.guap_username ||
+        session.user.user_metadata?.original_username ||
+        session.user.user_metadata?.username;
+      const password = localStorage.getItem('guap_password');
+
+      console.log('🔐 Данные для обновления задач:', {
+        guapUsername,
+        passwordExists: !!password
+      });
+
+      if (!guapUsername || !password) {
+        console.error('❌ Отсутствуют данные для авторизации');
+        messageApi.error('Данные для авторизации не найдены');
+        return;
+      }
+
+      // Используем API для обновления задач через парсер
+      console.log('🚀 Отправляем запрос на обновление задач');
+      const updateResponse = await fetch('/api/tasks/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: guapUsername,
+          password,
+          uid: userId
+        }),
+      });
+
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        throw new Error(`Update tasks API error: ${updateResponse.status} - ${errorText}`);
+      }
+
+      const updateData = await updateResponse.json();
+      console.log('📊 Ответ от update tasks API:', updateData);
+
+      if (updateData.success) {
+        setTasks(updateData.tasks || []);
+        messageApi.success('Задачи обновлены');
+      } else {
+        messageApi.error(updateData.message || 'Ошибка обновления задач');
+      }
+
+    } catch (error) {
+      console.error('❌ Ошибка обновления задач:', error);
+      messageApi.error('Ошибка обновления задач');
+    } finally {
+      setTasksFetchLock(false);
+    }
+  };
+
+  // Функция для форматирования дедлайнов
+  const formatDeadlineTasks = (tasks) => {
+    if (!tasks || !Array.isArray(tasks)) return [];
+
+    return tasks
+      .filter(task => {
+        // Фильтруем задачи с валидными дедлайнами (не "Спи спокойно")
+        const deadlineText = task.deadline?.text;
+        return deadlineText && deadlineText !== 'Спи спокойно';
+      })
+      .sort((a, b) => {
+        // Сортируем по дате дедлайна
+        const dateA = parseDate(a.deadline.text);
+        const dateB = parseDate(b.deadline.text);
+        return dateA - dateB;
+      })
+      .slice(0, 25); // Берем 5 ближайших дедлайнов
+  };
+
+  // Функция для парсинга даты из текста
+  const parseDate = (dateText) => {
+    if (!dateText || dateText === 'Спи спокойно') return Infinity;
+
+    try {
+      const [day, month, year] = dateText.split('.').map(Number);
+      return new Date(year, month - 1, day).getTime();
+    } catch (error) {
+      return Infinity;
+    }
+  };
+
+  const getDeadlineTagColor = (deadlineText) => {
+    if (!deadlineText || deadlineText === 'Спи спокойно') return 'default';
+
+    try {
+      const [day, month, year] = deadlineText.split('.').map(Number);
+      const deadlineDate = new Date(year, month - 1, day);
+      const today = new Date();
+      const timeDiff = deadlineDate.getTime() - today.getTime();
+      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+      if (daysDiff < 0) return 'error'; // Просрочено
+      if (daysDiff <= 3) return 'error'; // Меньше 3 дней
+      if (daysDiff <= 7) return 'warning'; // Меньше недели
+      return 'success'; // Больше недели
+    } catch (error) {
+      return 'default';
+    }
+  };
+
   const formatScheduleForSteps = (schedule) => {
     if (!schedule || !schedule.schedule || schedule.schedule.length === 0) return [];
 
@@ -274,6 +442,9 @@ export default function MainPage() {
         status,
         percent
       };
+
+
+
     });
   };
 
@@ -348,24 +519,49 @@ export default function MainPage() {
             filled
             mode="island"
             header={
-              <CellHeader titleStyle="caps">Ближайшие дедлайны</CellHeader>
+              <CellHeader titleStyle="caps">
+                <Flex direction="row" align="center" justify="space-between" >
+                  <span>Ближайшие дедлайны</span>
+                  <Button
+                    type="link"
+                    onClick={() => !tasksLoading && fetchTasks(user?.id, true)}
+                    disabled={tasksLoading}
+                    style={{ fontSize: '12px' }}
+                  >
+                    {tasksLoading ? <Spinner /> : 'Обновить'}
+                  </Button>
+                </Flex>
+              </CellHeader>
             }
           >
-            <CellSimple
-              after={<Tag color="error">{"19.08"}</Tag>}
-              title="Основы программирования"
-              subtitle="ЛР №5. «Множественное наследование в языке С++»"
-            ></CellSimple>
-            <CellSimple
-              after={<Tag color="warning">{11.11}</Tag>}
-              title="Основы программирования"
-              subtitle="ЛР №5Д. «Виртуальные функции и абстрактные классы»"
-            ></CellSimple>
-            <CellSimple
-              after={<Tag color="success">{14.12}</Tag>}
-              title="Основы программирования"
-              subtitle="ЛР №5Д. «Виртуальные функции и абстрактные классы»"
-            ></CellSimple>
+            {tasksLoading ? (
+              <CellSimple><Spinner /></CellSimple>
+            ) : formatDeadlineTasks(tasks).length > 0 ? (
+              formatDeadlineTasks(tasks).map((task, index) => (
+                <CellSimple
+                  key={index}
+                  after={
+                    <Tag color={getDeadlineTagColor(task.deadline?.text)}>
+                      {task.deadline?.text}
+                    </Tag>
+                  }
+                  title={task.subject?.name || 'Не указано'}
+                  subtitle={task.task?.name || task.task?.title || 'Без названия'}
+                ></CellSimple>
+              ))
+            ) : (
+              <CellSimple>
+                Нет ближайших дедлайнов
+                <Button
+                  type="link"
+                  onClick={() => !tasksLoading && fetchTasks(user?.id)}
+                  style={{ marginTop: '10px' }}
+                  disabled={tasksLoading}
+                >
+                  Загрузить задачи
+                </Button>
+              </CellSimple>
+            )}
           </CellList>
         </Container>
 
