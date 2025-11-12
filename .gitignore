@@ -6,6 +6,8 @@
 /.next/
 /out/
 
+/backend/app/myenv/
+
 # Production
 /build
 /dist
