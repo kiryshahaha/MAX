@@ -1,48 +1,36 @@
+# Dockerfile для parser с Puppeteer
+FROM node:20-bullseye-slim
 
-    FROM node:20-alpine3.21
+# Устанавливаем необходимые зависимости для Puppeteer
+RUN apt-get update && apt-get install -y \
+    chromium \
+    chromium-driver \
+    ca-certificates \
+    fonts-liberation \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libgbm1 \
+    libpango1.0-0 \
+    libasound2 \
+    udev \
+    tini \
+    curl \
+    git \
+    --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
-    # Установка зависимостей для Chromium
-    RUN apk add --no-cache \
-        chromium \
-        chromium-chromedriver \
-        nss \
-        freetype \
-        harfbuzz \
-        ca-certificates \
-        ttf-freefont \
-        bash \
-        curl \
-        git \
-        udev \
-        libx11 \
-        libxcomposite \
-        libxdamage \
-        libxext \
-        libxrandr \
-        libxrender \
-        libxtst \
-        alsa-lib \
-        at-spi2-core \
-        ttf-dejavu
-    
-    # Создаем рабочую директорию
-    WORKDIR /app
-    
-    # Копируем package.json и package-lock.json
-    COPY package*.json ./
-    
-    # Устанавливаем зависимости
-    RUN npm install
-    
-    # Копируем весь проект
-    COPY . .
-    
-    # Указываем Puppeteer использовать системный Chromium
-    ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
-    ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-    
-    # Опционально: если нужен headless режим
-    ENV PUPPETEER_HEADLESS=true
-    
-    # Команда запуска
-    CMD ["node", "server.js"]
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY . .
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "server.js"]
