@@ -13,8 +13,10 @@ export async function GET(request) {
 
     console.log('📅 Запрашиваем расписание на вчера для пользователя:', userId);
 
+    const fastApiUrl = process.env.FASTAPI_URL;
+
     // 1. Обращаемся к Python бэкенду
-    const backendResponse = await fetch(`http://127.0.0.1:8000/schedule/yesterday?uid=${userId}`);
+    const backendResponse = await fetch(`${fastApiUrl}/schedule/yesterday?uid=${userId}`);
 
     if (!backendResponse.ok) {
       throw new Error(`Backend error: ${backendResponse.status}`);

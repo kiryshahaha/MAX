@@ -21,8 +21,10 @@ export async function GET(request) {
     
     console.log('📅 Текущая локальная дата:', currentDateString);
 
+    const fastApiUrl = process.env.FASTAPI_URL;
+
     // 1. Сначала проверяем бэкенд (как было в оригинальной логике)
-    const backendResponse = await fetch(`http://127.0.0.1:8000/schedule/today?uid=${userId}`);
+    const backendResponse = await fetch(`${fastApiUrl}/schedule/today?uid=${userId}`);
 
     if (!backendResponse.ok) {
       throw new Error(`Backend error: ${backendResponse.status}`);

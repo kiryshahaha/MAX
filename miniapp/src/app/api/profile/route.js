@@ -15,8 +15,10 @@ export async function GET(request) {
 
     console.log('👤 Запрашиваем профиль для пользователя:', userId);
 
+    const fastApiUrl = process.env.FASTAPI_URL;
+
     // Запрашиваем профиль из бэкенда (FastAPI)
-    const backendResponse = await fetch(`http://127.0.0.1:8000/profile?uid=${userId}`);
+    const backendResponse = await fetch(`${fastApiUrl}/profile?uid=${userId}`);
 
     if (!backendResponse.ok) {
       throw new Error(`Backend error: ${backendResponse.status}`);

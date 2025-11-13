@@ -7,7 +7,7 @@ export async function GET(request) {
     const userId = searchParams.get('uid');
 
     if (!userId) {
-      return Response.json({ 
+      return Response.json({
         message: '❌ User ID is required',
         success: false
       }, { status: 400 });
@@ -15,8 +15,10 @@ export async function GET(request) {
 
     console.log('📝 Запрашиваем отчеты для пользователя:', userId);
 
+    const fastApiUrl = process.env.FASTAPI_URL;
+
     // 1. Сначала проверяем бэкенд (Supabase)
-    const backendResponse = await fetch(`http://127.0.0.1:8000/reports?uid=${userId}`);
+    const backendResponse = await fetch(`${fastApiUrl}/reports?uid=${userId}`);
 
     if (!backendResponse.ok) {
       throw new Error(`Backend error: ${backendResponse.status}`);
@@ -26,8 +28,8 @@ export async function GET(request) {
     console.log('📊 Ответ от бэкенда (отчеты):', backendData);
 
     // 2. Проверяем наличие отчетов в бэкенде
-    const hasValidReports = backendData.success && 
-      backendData.reports && 
+    const hasValidReports = backendData.success &&
+      backendData.reports &&
       backendData.reports_count > 0;
 
     console.log('🔍 Проверка отчетов:', {
@@ -59,7 +61,7 @@ export async function GET(request) {
   } catch (error) {
     console.error('❌ Reports API Error:', error);
     return Response.json(
-      { 
+      {
         message: `❌ Ошибка получения отчетов: ${error.message}`,
         success: false
       },

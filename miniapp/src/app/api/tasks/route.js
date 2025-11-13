@@ -15,8 +15,10 @@ export async function GET(request) {
 
     console.log('📝 Запрашиваем задачи для пользователя:', userId);
 
+    const fastApiUrl = process.env.FASTAPI_URL;
+
     // 1. Сначала проверяем бэкенд (Supabase)
-    const backendResponse = await fetch(`http://127.0.0.1:8000/tasks?uid=${userId}`);
+    const backendResponse = await fetch(`${fastApiUrl}/tasks?uid=${userId}`);
 
     if (!backendResponse.ok) {
       throw new Error(`Backend error: ${backendResponse.status}`);
