@@ -1,6 +1,8 @@
 // app/api/auth/logout/route.js
 import { clientSupabase } from "../../../../../lib/supabase-client";
 
+const PARSER_SERVICE_URL = process.env.PARSER_SERVICE_URL;
+
 export async function POST(request) {
   try {
     const { username } = await request.json();
@@ -16,7 +18,7 @@ export async function POST(request) {
 
     // 1. Отправляем запрос на логаут в парсер (если нужно)
     try {
-      await fetch('http://localhost:3001/api/logout', {
+      await fetch(`${PARSER_SERVICE_URL}/api/logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),

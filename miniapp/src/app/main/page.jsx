@@ -15,6 +15,7 @@ import {
 } from "@maxhub/max-ui";
 import { Badge, Divider, Steps, Tag, message } from "antd";
 import { clientSupabase as supabase } from "../../../lib/supabase-client";
+import PsychologistBooking from "../PsychologistBooking/PsychologistBooking";
 
 export default function MainPage() {
   const [user, setUser] = useState(null);
@@ -962,6 +963,10 @@ export default function MainPage() {
           </CellList>
         </Container>
 
+        <Divider></Divider>
+
+        <PsychologistBooking user={user} />
+        
         <Divider></Divider>
 
         <Container>
