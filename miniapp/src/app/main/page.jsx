@@ -51,40 +51,46 @@ export default function MainPage() {
   }, []);
 
   const checkAuth = async () => {
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
 
-      if (error || !session) {
-        console.log('❌ Нет активной сессии, перенаправляем на авторизацию');
-        router.replace('/auth');
-        return;
-      }
-
-      setUser(session.user);
-      setAuthChecked(true);
-
-      // Сбрасываем прогресс загрузки
-      setInitialLoadProgress({
-        schedule: false,
-        tasks: false,
-        reports: false
-      });
-
-      // Запускаем параллельную загрузку данных
-      console.log('🔄 Параллельная загрузка данных...');
-      await Promise.allSettled([
-        fetchTodaySchedule(session.user.id, true),
-        fetchTasks(session.user.id, false, true),
-        fetchReports(session.user.id, false, true)
-      ]);
-
-    } catch (error) {
-      console.error('Auth check error:', error);
+    if (error || !session) {
+      console.log('❌ Нет активной сессии, перенаправляем на авторизацию');
       router.replace('/auth');
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+
+    setUser(session.user);
+    setAuthChecked(true);
+
+    setInitialLoadProgress({
+      schedule: false,
+      tasks: false,
+      reports: false
+    });
+
+    console.log('🔄 Последовательная загрузка данных...');
+    
+    // 1. Расписание
+    await fetchTodaySchedule(session.user.id, true);
+    await new Promise(resolve => setTimeout(resolve, 500)); // небольшая пауза
+    
+    // 2. Задачи
+    await fetchTasks(session.user.id, false, true);
+    await new Promise(resolve => setTimeout(resolve, 500)); // небольшая пауза
+    
+    // 3. Отчеты
+    await fetchReports(session.user.id, false, true);
+
+    console.log('✅ Все данные загружены последовательно');
+
+  } catch (error) {
+    console.error('Auth check error:', error);
+    router.replace('/auth');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const fetchReports = async (userId, forceUpdate = false, isInitialLoad = false) => {
     if (reportsLoading && !isInitialLoad) {
