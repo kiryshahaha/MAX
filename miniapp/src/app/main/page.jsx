@@ -27,9 +27,9 @@ export default function MainPage() {
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [tasksFetchLock, setTasksFetchLock] = useState(false);
-  //   const [reports, setReports] = useState([]);
-  // const [reportsLoading, setReportsLoading] = useState(false);
-  // const [reportsFetchLock, setReportsFetchLock] = useState(false);
+  const [reports, setReports] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportsFetchLock, setReportsFetchLock] = useState(false);
 
   const initialLoadRef = useRef(true);
 
@@ -41,6 +41,7 @@ export default function MainPage() {
     }
   }, []);
 
+  // Обновите функцию checkAuth для загрузки отчетов
   const checkAuth = async () => {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -61,6 +62,9 @@ export default function MainPage() {
       // 2. Затем задачи
       await fetchTasks(session.user.id);
 
+      // 3. Затем отчеты
+      await fetchReports(session.user.id);
+
     } catch (error) {
       console.error('Auth check error:', error);
       messageApi.error('Ошибка авторизации');
@@ -70,114 +74,128 @@ export default function MainPage() {
     }
   };
 
-  // Функция для обновления отчетов
-  // const fetchReports = async (userId, forceUpdate = false) => {
-  //   if (reportsLoading) {
-  //     console.log('⏳ Запрос отчетов уже выполняется...');
-  //     return;
-  //   }
+  const fetchReports = async (userId, forceUpdate = false) => {
+    if (reportsLoading) {
+      console.log('⏳ Запрос отчетов уже выполняется...');
+      return;
+    }
 
-  //   try {
-  //     setReportsLoading(true);
-  //     console.log('📋 Запрашиваем отчеты для пользователя:', userId, { forceUpdate });
+    try {
+      setReportsLoading(true);
+      console.log('📋 Запрашиваем отчеты для пользователя:', userId, { forceUpdate });
 
-  //     if (forceUpdate) {
-  //       console.log('🔄 Принудительное обновление через парсер');
-  //       await updateReportsFromParser(userId);
-  //       return;
-  //     }
+      if (forceUpdate) {
+        console.log('🔄 Принудительное обновление через парсер');
+        await updateReportsFromParser(userId);
+        return;
+      }
 
-  //     const reportsResponse = await fetch(`/api/reports?uid=${userId}`);
+      const reportsResponse = await fetch(`/api/reports?uid=${userId}`);
 
-  //     if (!reportsResponse.ok) {
-  //       throw new Error(`Reports API error: ${reportsResponse.status}`);
-  //     }
+      if (!reportsResponse.ok) {
+        throw new Error(`Reports API error: ${reportsResponse.status}`);
+      }
 
-  //     const reportsData = await reportsResponse.json();
-  //     console.log('📊 Ответ от reports API:', reportsData);
+      const reportsData = await reportsResponse.json();
+      console.log('📊 Ответ от reports API:', reportsData);
 
-  //     if (reportsData.success && reportsData.reports && reportsData.reports_count > 0) {
-  //       console.log('✅ Используем отчеты из бэкенда');
-  //       setReports(reportsData.reports);
-  //     } else {
-  //       console.log('🔄 Отчеты не найдены в БД, обновляем через парсер');
-  //       await updateReportsFromParser(userId);
-  //     }
+      // ДОБАВЬТЕ ЭТО ДЛЯ ДИАГНОСТИКИ СТРУКТУРЫ ДАННЫХ
+      if (reportsData.reports && reportsData.reports.length > 0) {
+        console.log('🔍 ДИАГНОСТИКА СТРУКТУРЫ ОТЧЕТОВ:', {
+          totalReports: reportsData.reports.length,
+          firstReport: reportsData.reports[0],
+          statusStructure: reportsData.reports.map(r => ({
+            number: r.number,
+            status: r.status,
+            statusType: typeof r.status,
+            taskName: r.taskName
+          }))
+        });
+      }
 
-  //   } catch (error) {
-  //     console.error('❌ Ошибка получения отчетов:', error);
-  //     messageApi.error('Ошибка загрузки отчетов');
-  //   } finally {
-  //     setReportsLoading(false);
-  //   }
-  // };
+      if (reportsData.success && reportsData.reports && reportsData.reports_count > 0) {
+        console.log('✅ Используем отчеты из бэкенда');
+        setReports(reportsData.reports);
+      } else {
+        console.log('🔄 Отчеты не найдены в БД, обновляем через парсер');
+        await updateReportsFromParser(userId);
+      }
 
-  // const updateReportsFromParser = async (userId) => {
-  //   if (reportsFetchLock) {
-  //     console.log('⏳ Запрос отчетов уже выполняется, ждем...');
-  //     return;
-  //   }
+    } catch (error) {
+      console.error('❌ Ошибка получения отчетов:', error);
+      messageApi.error('Ошибка загрузки отчетов');
+    } finally {
+      setReportsLoading(false);
+    }
+  };
 
-  //   try {
-  //     setReportsFetchLock(true);
+  // Функция для обновления отчетов через парсер
+  const updateReportsFromParser = async (userId) => {
+    if (reportsFetchLock) {
+      console.log('⏳ Запрос отчетов уже выполняется, ждем...');
+      return;
+    }
 
-  //     const { data: { session } } = await supabase.auth.getSession();
-  //     if (!session) {
-  //       messageApi.error('Сессия не найдена');
-  //       return;
-  //     }
+    try {
+      setReportsFetchLock(true);
 
-  //     const guapUsername = session.user.user_metadata?.guap_username ||
-  //       session.user.user_metadata?.original_username ||
-  //       session.user.user_metadata?.username;
-  //     const password = localStorage.getItem('guap_password');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        messageApi.error('Сессия не найдена');
+        return;
+      }
 
-  //     console.log('🔐 Данные для обновления отчетов:', {
-  //       guapUsername,
-  //       passwordExists: !!password
-  //     });
+      const guapUsername = session.user.user_metadata?.guap_username ||
+        session.user.user_metadata?.original_username ||
+        session.user.user_metadata?.username;
+      const password = localStorage.getItem('guap_password');
 
-  //     if (!guapUsername || !password) {
-  //       console.error('❌ Отсутствуют данные для авторизации');
-  //       messageApi.error('Данные для авторизации не найдены');
-  //       return;
-  //     }
+      console.log('🔐 Данные для обновления отчетов:', {
+        guapUsername,
+        passwordExists: !!password
+      });
 
-  //     console.log('🚀 Отправляем запрос на обновление отчетов');
-  //     const updateResponse = await fetch('/api/reports/update', {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //       },
-  //       body: JSON.stringify({
-  //         username: guapUsername,
-  //         password,
-  //         uid: userId
-  //       }),
-  //     });
+      if (!guapUsername || !password) {
+        console.error('❌ Отсутствуют данные для авторизации');
+        messageApi.error('Данные для авторизации не найдены');
+        return;
+      }
 
-  //     if (!updateResponse.ok) {
-  //       const errorText = await updateResponse.text();
-  //       throw new Error(`Update reports API error: ${updateResponse.status} - ${errorText}`);
-  //     }
+      console.log('🚀 Отправляем запрос на обновление отчетов');
+      const updateResponse = await fetch('/api/reports/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: guapUsername,
+          password,
+          uid: userId
+        }),
+      });
 
-  //     const updateData = await updateResponse.json();
-  //     console.log('📊 Ответ от update reports API:', updateData);
+      if (!updateResponse.ok) {
+        const errorText = await updateResponse.text();
+        throw new Error(`Update reports API error: ${updateResponse.status} - ${errorText}`);
+      }
 
-  //     if (updateData.success) {
-  //       setReports(updateData.reports || []);
-  //       messageApi.success('Отчеты обновлены');
-  //     } else {
-  //       messageApi.error(updateData.message || 'Ошибка обновления отчетов');
-  //     }
+      const updateData = await updateResponse.json();
+      console.log('📊 Ответ от update reports API:', updateData);
 
-  //   } catch (error) {
-  //     console.error('❌ Ошибка обновления отчетов:', error);
-  //     messageApi.error('Ошибка обновления отчетов');
-  //   } finally {
-  //     setReportsFetchLock(false);
-  //   }
-  // };
+      if (updateData.success) {
+        setReports(updateData.reports || []);
+        messageApi.success('Отчеты обновлены');
+      } else {
+        messageApi.error(updateData.message || 'Ошибка обновления отчетов');
+      }
+
+    } catch (error) {
+      console.error('❌ Ошибка обновления отчетов:', error);
+      messageApi.error('Ошибка обновления отчетов');
+    } finally {
+      setReportsFetchLock(false);
+    }
+  };
 
   const fetchTodaySchedule = async (userId) => {
     if (scheduleLoading) {
@@ -589,8 +607,8 @@ export default function MainPage() {
 
       return {
         title: classItem.subject || 'Не указано',
-        description: `${classItem.timeRange || ''}${classItem.building ? `, ${classItem.building}` : ''}${classItem.location ? `, ${classItem.location}` : ''}`,
-        subTitle: classItem.pairNumber || '',
+        description: `${classItem.type || ''}${classItem.timeRange ? ` • ${classItem.timeRange}` : ''}${classItem.building ? `, ${classItem.building}` : ''}${classItem.location ? `, ${classItem.location}` : ''}`,
+        subTitle: classItem.pairNumber ? `${classItem.pairNumber}` : '',
         status,
         percent
       };
@@ -599,6 +617,150 @@ export default function MainPage() {
 
     });
   };
+
+  // Исправленная функция для фильтрации и форматирования отчетов
+  const getReportTitle = (report) => {
+    if (!report) return 'Без названия';
+
+    return report.task?.name || 'Без названия';
+  };
+
+  // Функция для получения преподавателя
+  const getReportTeacher = (report) => {
+    if (!report) return 'Не указан';
+
+    return report.teacher?.full_name || 'Не указан';
+  };
+
+  // Улучшенная функция для фильтрации и форматирования отчетов
+  const formatReports = (reports) => {
+    if (!reports || !Array.isArray(reports)) return { pending: [], recentProcessed: [] };
+
+    console.log('🔍 formatReports - входные данные:', reports);
+
+    // ДИАГНОСТИКА СТРУКТУРЫ
+    if (reports.length > 0) {
+      console.log('🔍 СТРУКТУРА ОТЧЕТА:', {
+        taskName: getReportTitle(reports[0]),
+        teacher: getReportTeacher(reports[0]),
+        status: getReportStatusText(reports[0].status)
+      });
+    }
+
+    const pendingReports = reports.filter(report => {
+      const statusText = getReportStatusText(report.status);
+      return statusText === 'Ожидает';
+    });
+
+    // Получаем отклоненные/принятые отчеты и сортируем по номеру (новые сначала)
+    const processedReports = reports
+      .filter(report => {
+        const statusText = getReportStatusText(report.status);
+        return statusText === 'Отклонен' || statusText === 'Принят';
+      })
+      .sort((a, b) => {
+        const numA = parseInt(a.number) || 0;
+        const numB = parseInt(b.number) || 0;
+        return numB - numA; // Новые сначала
+      })
+      .slice(0, 5);
+
+    console.log('🔍 formatReports - результат:', {
+      pending: pendingReports.length,
+      processed: processedReports.length,
+      pendingTitles: pendingReports.map(r => getReportTitle(r)),
+      processedTitles: processedReports.map(r => getReportTitle(r))
+    });
+
+    return {
+      pending: pendingReports,
+      recentProcessed: processedReports
+    };
+  };
+
+  const getReportStatusColor = (status) => {
+    const statusText = getReportStatusText(status);
+    const statusLower = statusText.toLowerCase();
+
+    switch (statusLower) {
+      case 'ожидает':
+        return 'processing';
+      case 'принят':
+        return 'success';
+      case 'отклонен':
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+
+
+  // Улучшенная функция для получения текста статуса
+  const getReportStatusText = (status) => {
+    if (!status) return 'Неизвестно';
+
+    // Если статус - строка, используем как есть
+    if (typeof status === 'string') {
+      const statusLower = status.toLowerCase();
+      switch (statusLower) {
+        case 'ожидает проверки':
+          return 'Ожидает';
+        case 'принят':
+          return 'Принят';
+        case 'отклонен':
+        case 'не принят':
+          return 'Отклонен';
+        default:
+          return status;
+      }
+    }
+    // Если статус - объект, извлекаем текстовое значение
+    if (typeof status === 'object') {
+      // Пробуем разные возможные поля
+      const statusValue = status.text || status.name || status.value || status.status;
+      if (statusValue) {
+        const statusLower = String(statusValue).toLowerCase();
+        switch (statusLower) {
+          case 'ожидает проверки':
+            return 'Ожидает';
+          case 'принят':
+            return 'Принят';
+          case 'отклонен':
+          case 'не принят':
+            return 'Отклонен';
+          default:
+            return String(statusValue);
+        }
+      }
+    }
+
+    return 'Неизвестно';
+  };
+
+  // Добавьте обработчик для обновления отчетов
+  const handleUpdateReports = async () => {
+    if (reportsLoading) return;
+
+    try {
+      await fetchReports(user?.id, true);
+    } catch (error) {
+      console.error('Ошибка при обновлении отчетов:', error);
+    }
+  };
+
+  const getWeekDotColor = (schedule) => {
+    if (!schedule?.metadata?.is_even_week) {
+      return 'accent-red'; // По умолчанию красный, если данные недоступны
+    }
+
+    return schedule.metadata.is_even_week ? 'accent-blue' : 'accent-red';
+  };
+
+  console.log('📅 Расписание загружено:', {
+    hasSchedule: !!todaySchedule,
+    hasMetadata: !!todaySchedule?.metadata,
+    isEvenWeek: todaySchedule?.metadata?.is_even_week
+  });
 
   return (
     <Panel mode="secondary" className="wrap">
@@ -616,7 +778,15 @@ export default function MainPage() {
             header={
               <CellHeader
                 titleStyle="caps"
-                after={<Dot appearance="accent-red"></Dot>}
+                after={
+                  <Dot
+                    appearance={
+                      todaySchedule?.metadata?.is_even_week !== undefined
+                        ? (todaySchedule.metadata.is_even_week ? 'themed' : 'accent-red')
+                        : 'accent-red'
+                    }
+                  ></Dot>
+                }
               >
                 Расписание на сегодня {todaySchedule?.date_dd_mm}
               </CellHeader>
@@ -711,6 +881,81 @@ export default function MainPage() {
                   disabled={tasksLoading}
                 >
                   Загрузить задачи
+                </Button>
+              </CellSimple>
+            )}
+          </CellList>
+        </Container>
+
+        <Divider></Divider>
+
+        <Container>
+          <CellList
+            filled
+            mode="island"
+            header={
+              <CellHeader titleStyle="caps">
+                <Flex direction="row" align="center" justify="space-between">
+                  <span>Отчеты</span>
+                  <Button
+                    type="link"
+                    onClick={handleUpdateReports}
+                    disabled={reportsLoading}
+                    style={{ fontSize: '12px' }}
+                  >
+                    {reportsLoading ? <Spinner /> : 'Обновить'}
+                  </Button>
+                </Flex>
+              </CellHeader>
+            }
+          >
+            {reportsLoading ? (
+              <CellSimple><Spinner /></CellSimple>
+            ) : reports.length > 0 ? (
+              <>
+                {/* Все отчеты со статусом "ожидает проверки" */}
+                {formatReports(reports).pending.map((report, index) => (
+                  <CellSimple
+                    key={`pending-${index}`}
+                    after={
+                      <Tag color={getReportStatusColor(report.status)}>
+                        {getReportStatusText(report.status)}
+                      </Tag>
+                    }
+                    title={getReportTitle(report)}
+                    subtitle={`Преподаватель: ${getReportTeacher(report)}`}
+                  ></CellSimple>
+                ))}
+
+                {/* Последние 5 отклоненных/принятых отчетов */}
+                {formatReports(reports).recentProcessed.map((report, index) => (
+                  <CellSimple
+                    key={`processed-${index}`}
+                    after={
+                      <Tag color={getReportStatusColor(report.status)}>
+                        {getReportStatusText(report.status)}
+                      </Tag>
+                    }
+                    title={getReportTitle(report)}
+                    subtitle={`Преподаватель: ${getReportTeacher(report)}`}
+                  ></CellSimple>
+                ))}
+
+                {/* Если нет отчетов для показа */}
+                {formatReports(reports).pending.length === 0 && formatReports(reports).recentProcessed.length === 0 && (
+                  <CellSimple>Нет отчетов для отображения</CellSimple>
+                )}
+              </>
+            ) : (
+              <CellSimple>
+                Отчеты не загружены
+                <Button
+                  type="link"
+                  onClick={handleUpdateReports}
+                  style={{ marginTop: '10px' }}
+                  disabled={reportsLoading}
+                >
+                  Загрузить отчеты
                 </Button>
               </CellSimple>
             )}
