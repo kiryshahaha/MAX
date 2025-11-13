@@ -109,7 +109,8 @@ export default function Auth() {
 
   const initializeParserSession = async (username, password) => {
     try {
-      const response = await fetch('http://localhost:3001/api/scrape/init-session', {
+      const parserUrl = process.env.NEXT_PUBLIC_PARSER_SERVICE_URL;
+      const response = await fetch(`${parserUrl}/api/scrape/init-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
