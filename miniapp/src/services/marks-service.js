@@ -1,10 +1,13 @@
 // services/marks-service.js
-import { adminSupabase } from "../../lib/supabase-client";
+import { getAdminSupabase } from "../../lib/supabase-client";
 import { CONTROL_TYPES, MARK_TYPES, MARK_COLORS } from "../constants/marks-constants";
 
 export const marksService = {
   async saveUserMarks(userId, marks, requestedSemester = null, filters = {}) {
     try {
+
+ const adminSupabase = getAdminSupabase();
+
       console.log('💾 Начинаем сохранение оценок для пользователя:', userId);
       console.log('📝 Количество оценок для сохранения:', marks.length);
       console.log('📅 Запрошенный семестр:', requestedSemester, typeof requestedSemester);
@@ -184,6 +187,9 @@ export const marksService = {
   // Получение профиля пользователя
   async getUserProfile(userId) {
     try {
+
+ const adminSupabase = getAdminSupabase();
+
       const { data, error } = await adminSupabase
         .from('user_data')
         .select('profile')
@@ -346,6 +352,9 @@ export const marksService = {
   // Новый метод для получения оценок пользователя
   async getUserMarks(userId) {
     try {
+
+ const adminSupabase = getAdminSupabase();
+      
       const { data, error } = await adminSupabase
         .from('user_data')
         .select('marks, updated_at')

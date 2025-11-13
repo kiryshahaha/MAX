@@ -40,3 +40,5 @@ export const getAdminSupabase = () => {
     }
   );
 };
+
+// НЕ экспортируем adminSupabase глобально - создаем только при вызове функции

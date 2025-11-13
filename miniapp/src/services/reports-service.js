@@ -1,8 +1,11 @@
-import { adminSupabase } from "../../lib/supabase-client";
+import { getAdminSupabase } from "../../lib/supabase-client";
 
 export const reportsService = {
   async saveUserReports(userId, reports) {
     try {
+
+ const adminSupabase = getAdminSupabase();
+
       console.log('💾 Начинаем сохранение отчетов для пользователя:', userId);
       console.log('📝 Количество отчетов для сохранения:', reports.length);
       

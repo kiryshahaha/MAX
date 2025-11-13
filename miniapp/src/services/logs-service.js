@@ -1,8 +1,11 @@
-import { adminSupabase } from "../../lib/supabase-client";
+import { getAdminSupabase } from "../../lib/supabase-client";
 
 export const logsService = {
   async logLogin(username, success, count = 0, errorMessage = '', type = 'tasks') {
     try {
+
+       const adminSupabase = getAdminSupabase();
+
       const logData = {
         username,
         success,

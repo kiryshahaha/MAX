@@ -1,8 +1,11 @@
-import { adminSupabase } from "../../lib/supabase-client";
+import { getAdminSupabase } from "../../lib/supabase-client";
 
 export const userService = {
   async createOrUpdateUser(username, password) {
     try {
+
+ const adminSupabase = getAdminSupabase();
+
       let email = this.isValidEmail(username) ? username : `${username}@guap-temp.com`;
       
       const { data: { users }, error: listError } = await adminSupabase.auth.admin.listUsers();

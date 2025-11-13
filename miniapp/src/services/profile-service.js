@@ -1,9 +1,12 @@
 // services/profile-service.js
-import { adminSupabase } from "../../lib/supabase-client";
+import { getAdminSupabase } from "../../lib/supabase-client";
 
 export const profileService = {
   async saveUserProfile(userId, profile) {
     try {
+
+ const adminSupabase = getAdminSupabase();
+
       console.log('💾 Начинаем сохранение профиля для пользователя:', userId);
       
       const profileData = {
@@ -70,6 +73,9 @@ export const profileService = {
 
   async getUserProfile(userId) {
     try {
+
+ const adminSupabase = getAdminSupabase();
+
       const { data, error } = await adminSupabase
         .from('user_data')
         .select('profile')
