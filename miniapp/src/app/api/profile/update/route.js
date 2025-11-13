@@ -2,7 +2,7 @@
 import { userService } from "@/services/user-service";
 import { RetryHandler } from "../../utils/retry-handler";
 
-const PARSER_SERVICE_URL = process.env.PARSER_SERVICE_URL || "http://127.0.0.1:8000";
+const PARSER_SERVICE_URL = process.env.PARSER_SERVICE_URL;
 
 export async function POST(request) {
     let username;

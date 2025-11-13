@@ -3,7 +3,7 @@ import { userService } from "@/services/user-service";
 import { getAdminSupabase } from "../../../../../lib/supabase-client";
 
 // ✅ ДОБАВЬТЕ ЭТУ СТРОКУ:
-const PARSER_SERVICE_URL = process.env.PARSER_SERVICE_URL || "http://127.0.0.1:8000";
+const PARSER_SERVICE_URL = process.env.PARSER_SERVICE_URL;
 
 export async function POST(request) {
     let username;
