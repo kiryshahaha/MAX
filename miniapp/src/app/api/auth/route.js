@@ -1,6 +1,7 @@
 import { userService } from "@/services/user-service";
 import { tasksService } from "@/services/tasks-service";
 import { logsService } from "@/services/logs-service";
+import { RetryHandler } from "../utils/retry-handler";
 
 const PARSER_SERVICE_URL = process.env.PARSER_SERVICE_URL;
 
@@ -30,18 +31,22 @@ export async function POST(request) {
       console.log('Не удалось загрузить сохраненные задачи:', cacheError.message);
     }
 
-    // Если сохраненных задач нет, обращаемся к парсеру
-    const parserResponse = await fetch(`${PARSER_SERVICE_URL}/api/scrape`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ username, password }),
-    });
+    // Если сохраненных задач нет, обращаемся к парсеру с retry логикой
+    const parserResponse = await RetryHandler.withRetry(async () => {
+      const response = await fetch(`${PARSER_SERVICE_URL}/api/scrape`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-    if (!parserResponse.ok) {
-      throw new Error(`Parser service error: ${parserResponse.status}`);
-    }
+      if (!response.ok) {
+        throw new Error(`Parser service error: ${response.status}`);
+      }
+
+      return response;
+    }, 3, 1500); // 3 попытки с задержкой 1.5 сек
 
     const result = await parserResponse.json();
 

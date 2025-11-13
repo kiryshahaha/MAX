@@ -8,38 +8,49 @@ export class GuapProfileScraper extends BaseScraper {
     this.authStrategy = GuapAuthStrategy;
   }
 
-    async scrapeProfile(credentials) {
-    let page;
+   async scrapeProfile(credentials) {
+  let page;
+  let sessionInvalidated = false;
+  
+  try {
+    await this.validateCredentials(credentials);
+    page = await this.getAuthenticatedPage(credentials);
+
+    // Переход к профилю с улучшенной обработкой ошибок
+    await this.navigateToProfile(page);
     
-    try {
-      await this.validateCredentials(credentials);
-      page = await this.getAuthenticatedPage(credentials);
+    // Парсинг данных профиля
+    const profileData = await this.parseProfile(page);
+    
+    return {
+      success: true,
+      message: `✅ Профиль успешно получен!`,
+      profile: profileData
+    };
 
-      // Переход к профилю
-      await this.navigateToProfile(page);
-      
-      // Парсинг данных профиля
-      const profileData = await this.parseProfile(page);
-      
-      return {
-        success: true,
-        message: `✅ Профиль успешно получен!`,
-        profile: profileData
-      };
-
-    } catch (error) {
-      if (page) {
-        await this.invalidateSession(credentials);
-      }
-      throw error;
+  } catch (error) {
+    console.error('❌ Ошибка при скрапинге профиля:', error);
+    
+    // Инвалидируем сессию только при определенных ошибках
+    if (page && !sessionInvalidated && 
+        (error.message.includes('detached') || 
+         error.message.includes('closed') ||
+         error.message.includes('ERR_ABORTED'))) {
+      sessionInvalidated = true;
+      await this.invalidateSession(credentials);
     }
+    
+    throw error;
   }
+}
 
-  async navigateToProfile(page) {
-    console.log('Переходим на страницу профиля...');
+async navigateToProfile(page) {
+  console.log('Переходим на страницу профиля...');
+  
+  try {
     await page.goto('https://pro.guap.ru/inside/profile', { 
-      waitUntil: 'networkidle2', 
-      timeout: 30000 
+      waitUntil: 'domcontentloaded', // ИЗМЕНИТЬ waitUntil
+      timeout: 20000 
     });
     
     // Ждем загрузки основных элементов профиля
@@ -47,7 +58,21 @@ export class GuapProfileScraper extends BaseScraper {
       const profileCards = document.querySelectorAll('.card');
       return profileCards.length > 0;
     }, { timeout: 10000 });
+    
+  } catch (error) {
+    console.error('❌ Ошибка навигации к профилю:', error);
+    
+    // Проверяем текущее состояние страницы
+    try {
+      const currentUrl = page.url();
+      console.log('Текущий URL после ошибки:', currentUrl);
+    } catch (e) {
+      console.log('Не удалось получить URL страницы');
+    }
+    
+    throw error;
   }
+}
 
   async parseProfile(page) {
     return await page.evaluate(() => {

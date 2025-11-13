@@ -18,6 +18,24 @@ export class ErrorHandler {
       };
     }
     
+    // Обработка сетевых ошибок
+    if (error.message.includes('ERR_ABORTED') || error.message.includes('detached')) {
+      return {
+        message: '⚠️ Проблема с подключением к серверу ГУАП. Попробуйте позже.',
+        status: 503,
+        retryable: true
+      };
+    }
+    
+    // Обработка таймаутов
+    if (error.message.includes('timeout') || error.message.includes('Timeout')) {
+      return {
+        message: '⚠️ Превышено время ожидания ответа от сервера ГУАП.',
+        status: 504,
+        retryable: true
+      };
+    }
+    
     return {
       message: '⚠️ Ошибка при выполнении скрипта: ' + error.message,
       status: 500

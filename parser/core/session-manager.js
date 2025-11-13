@@ -81,14 +81,23 @@ export class SessionManager {
   }
 
   // Получение существующей сессии
-  static getSession(username) {
-    const session = this.sessions.get(username);
-    if (session && this.isSessionValid(session)) {
-      this.updateActivity(username);
-      return session;
-    }
+static getSession(username) {
+  const session = this.sessions.get(username);
+  
+  if (!session) {
     return null;
   }
+  
+  // ПРОВЕРКА ВАЛИДНОСТИ ПЕРЕД ВОЗВРАТОМ
+  if (!this.isSessionValid(session) || !this.validateSession(username)) {
+    console.log(`🗑️ Удаление невалидной сессии: ${username}`);
+    this.sessions.delete(username);
+    return null;
+  }
+  
+  this.updateActivity(username);
+  return session;
+}
 
   // Проверка валидности сессии
   static isSessionValid(session) {
@@ -234,4 +243,29 @@ export class SessionManager {
     return false;
   }
 }
+static async validateSession(username) {
+  const session = this.sessions.get(username);
+  if (!session) return false;
+  
+  try {
+    // Проверяем, что страница жива и доступна
+    if (session.page.isClosed()) {
+      console.log(`❌ Страница закрыта для пользователя: ${username}`);
+      return false;
+    }
+    
+    // Простая проверка доступности DOM
+    await session.page.evaluate(() => {
+      if (!document || !document.body) {
+        throw new Error('DOM not available');
+      }
+    });
+    
+    return true;
+  } catch (error) {
+    console.log(`❌ Сессия невалидна для ${username}:`, error.message);
+    return false;
+  }
+}
+
 }

@@ -6,6 +6,7 @@ import "./globals.css";
 import { App, ConfigProvider, theme } from "antd";
 import { useEffect, useState } from "react";
 import BottomNavBar from "@/components/BottomNavBar/BottomNavBar";
+import { usePathname } from "next/navigation";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,6 +23,7 @@ const MaxUI = dynamic(() => import("@maxhub/max-ui").then((mod) => mod.MaxUI), {
 
 export default function RootLayout({ children }) {
   const [isDark, setIsDark] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark");
@@ -30,6 +32,9 @@ export default function RootLayout({ children }) {
     media.addEventListener("change", handler);
     return () => media.removeEventListener("change", handler);
   }, []);
+
+  // Не показываем навбар на странице авторизации
+  const showNavBar = pathname !== '/auth';
 
   return (
     <html lang="en">
@@ -42,7 +47,7 @@ export default function RootLayout({ children }) {
           >
             <MaxUI>
               {children}
-              <BottomNavBar />
+              {showNavBar && <BottomNavBar />}
             </MaxUI>
           </ConfigProvider>
         </App>

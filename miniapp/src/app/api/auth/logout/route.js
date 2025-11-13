@@ -16,32 +16,42 @@ export async function POST(request) {
 
     console.log('🚪 Запрос на выход пользователя:', username);
 
-    // 1. Отправляем запрос на логаут в парсер (если нужно)
+    // 1. Сначала выходим из парсера
     try {
-      await fetch(`${PARSER_SERVICE_URL}/api/logout`, {
+      const parserResponse = await fetch(`${PARSER_SERVICE_URL}/api/scrape/logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),
       });
-      console.log('✅ Логаут в парсере выполнен');
+
+      if (parserResponse.ok) {
+        console.log('✅ Сессия парсера очищена');
+      } else {
+        console.warn('⚠️ Не удалось очистить сессию парсера');
+      }
     } catch (parserError) {
-      console.warn('⚠️ Ошибка логаута в парсере:', parserError.message);
-      // Продолжаем выполнение, даже если парсер недоступен
+      console.warn('⚠️ Парсер недоступен при логауте:', parserError.message);
     }
 
-    // 2. Выход из Supabase
+    // 2. Затем выходим из Supabase
     const { error: supabaseError } = await clientSupabase.auth.signOut();
     
     if (supabaseError) {
-      throw new Error(`Supabase logout error: ${supabaseError.message}`);
+      console.error('Supabase logout error:', supabaseError);
     }
 
-    console.log('✅ Успешный выход из системы');
-
-    return Response.json({
+    // 3. Очищаем все данные на клиенте через cookie
+    const response = Response.json({
       success: true,
       message: 'Успешный выход из системы'
     });
+
+    // Добавляем headers для очистки клиентских данных
+    response.headers.set('Clear-Site-Data', '"cache", "cookies", "storage", "executionContexts"');
+
+    console.log('✅ Успешный выход из системы');
+
+    return response;
 
   } catch (error) {
     console.error('❌ Logout API Error:', error);

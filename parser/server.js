@@ -34,15 +34,19 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-app.post('/api/logout', async (req, res) => {
+app.post('/api/scrape/logout', async (req, res) => {
   try {
     const { username } = req.body;
     
     if (username) {
       const session = SessionManager.sessions.get(username);
       if (session) {
-        await session.page.close();
-        await session.browser.close();
+        try {
+          await session.page.close();
+          await session.browser.close();
+        } catch (e) {
+          console.log('Ошибка при закрытии браузера:', e.message);
+        }
         SessionManager.sessions.delete(username);
         console.log(`✅ Сессия парсера закрыта для: ${username}`);
       }
@@ -50,6 +54,7 @@ app.post('/api/logout', async (req, res) => {
     
     res.json({ success: true, message: '✅ Сессии завершены' });
   } catch (error) {
+    console.error('Ошибка при выходе из парсера:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
