@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
-};
+  // Отключаем индикатор сборки в development
+  devIndicators: {
+    buildActivity: false,
+    buildActivityPosition: null,
+  }
+}
 
-export default nextConfig;
+export default nextConfig
