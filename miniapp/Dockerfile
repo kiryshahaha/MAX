@@ -8,4 +8,10 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
-CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "5173"]
+RUN npm run build
+
+# Указываем порт который слушает приложение
+EXPOSE 5173
+
+# Запускаем продакшен сервер
+CMD ["npm", "start"]
