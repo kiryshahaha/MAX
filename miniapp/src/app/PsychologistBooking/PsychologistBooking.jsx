@@ -54,13 +54,13 @@ export default function PsychologistBooking({ user }) {
     try {
       setAppointmentsLoading(true);
       const response = await fetch(`/api/psychologists/appointments?user_id=${user.id}`);
-      
+
       if (!response.ok) {
         throw new Error(`Appointments API error: ${response.status}`);
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         setUserAppointments(data.appointments || []);
       } else {
@@ -80,17 +80,17 @@ export default function PsychologistBooking({ user }) {
     try {
       const dates = [];
       const today = dayjs();
-      
+
       // Проверяем доступность на ближайшие 30 дней
       for (let i = 0; i < 30; i++) {
         const date = today.add(i, 'day');
         const dateString = date.format('YYYY-MM-DD');
-        
+
         try {
           const response = await fetch(
             `/api/psychologists/available-slots?psychologist_name=${encodeURIComponent(psychologist)}&date=${dateString}`
           );
-          
+
           if (response.ok) {
             const data = await response.json();
             if (data.success && data.available_slots && data.available_slots.length > 0) {
@@ -101,7 +101,7 @@ export default function PsychologistBooking({ user }) {
           console.error(`Ошибка проверки даты ${dateString}:`, error);
         }
       }
-      
+
       setAvailableDates(dates);
     } catch (error) {
       console.error('❌ Ошибка получения доступных дат:', error);
@@ -110,52 +110,52 @@ export default function PsychologistBooking({ user }) {
   };
 
   const getAvailableSlots = async (psychologist, date) => {
-  if (!psychologist || !date) return;
+    if (!psychologist || !date) return;
 
-  try {
-    setLoading(true);
-    const dateString = date.format('YYYY-MM-DD');
-    
-    const response = await fetch(
-      `/api/psychologists/available-slots?psychologist_name=${encodeURIComponent(psychologist)}&date=${dateString}`
-    );
-    
-    if (!response.ok) {
-      throw new Error(`Slots API error: ${response.status}`);
+    try {
+      setLoading(true);
+      const dateString = date.format('YYYY-MM-DD');
+
+      const response = await fetch(
+        `/api/psychologists/available-slots?psychologist_name=${encodeURIComponent(psychologist)}&date=${dateString}`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Slots API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Преобразуем слоты в читаемый формат и фильтруем по рабочим часам
+        const formattedSlots = data.available_slots
+          .map(slot => {
+            if (typeof slot === 'string' && slot.includes('T')) {
+              // Если слот в формате "2025-11-18T16:00:00", извлекаем время
+              return dayjs(slot).format('HH:mm');
+            }
+            return slot; // Если уже в формате "16:00"
+          })
+          .filter(slot => {
+            // Фильтруем слоты, которые входят в рабочие часы психолога
+            // Для Клепова Дмитрия Олеговича: с 11:00 до 16:00
+            const hour = parseInt(slot.split(':')[0]);
+            return hour >= 11 && hour < 16; // с 11:00 до 15:59
+          });
+
+        console.log('🕒 Доступные слоты после фильтрации:', formattedSlots);
+        setAvailableSlots(formattedSlots);
+      } else {
+        throw new Error(data.message);
+      }
+    } catch (error) {
+      console.error('❌ Ошибка получения слотов:', error);
+      message.error('Ошибка получения доступного времени');
+      setAvailableSlots([]);
+    } finally {
+      setLoading(false);
     }
-
-    const data = await response.json();
-    
-    if (data.success) {
-      // Преобразуем слоты в читаемый формат и фильтруем по рабочим часам
-      const formattedSlots = data.available_slots
-        .map(slot => {
-          if (typeof slot === 'string' && slot.includes('T')) {
-            // Если слот в формате "2025-11-18T16:00:00", извлекаем время
-            return dayjs(slot).format('HH:mm');
-          }
-          return slot; // Если уже в формате "16:00"
-        })
-        .filter(slot => {
-          // Фильтруем слоты, которые входят в рабочие часы психолога
-          // Для Клепова Дмитрия Олеговича: с 11:00 до 16:00
-          const hour = parseInt(slot.split(':')[0]);
-          return hour >= 11 && hour < 16; // с 11:00 до 15:59
-        });
-
-      console.log('🕒 Доступные слоты после фильтрации:', formattedSlots);
-      setAvailableSlots(formattedSlots);
-    } else {
-      throw new Error(data.message);
-    }
-  } catch (error) {
-    console.error('❌ Ошибка получения слотов:', error);
-    message.error('Ошибка получения доступного времени');
-    setAvailableSlots([]);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handlePsychologistChange = (value) => {
     setSelectedPsychologist(value);
@@ -167,7 +167,7 @@ export default function PsychologistBooking({ user }) {
   const handleDateChange = (date) => {
     setSelectedDate(date);
     setSelectedTime(null);
-    
+
     if (date && selectedPsychologist) {
       getAvailableSlots(selectedPsychologist, date);
     } else {
@@ -179,70 +179,70 @@ export default function PsychologistBooking({ user }) {
     setSelectedTime(time);
   };
 
-const createAppointment = async () => {
-  if (!selectedPsychologist || !selectedDate || !selectedTime) {
-    message.error('Пожалуйста, заполните все поля');
-    return;
-  }
-
-  try {
-    setLoading(true);
-    
-    // Формируем дату-время в московском часовом поясе
-    const [hours, minutes] = selectedTime.split(':').map(Number);
-    
-    const appointmentDateTime = selectedDate
-      .hour(hours)
-      .minute(minutes)
-      .second(0)
-      .millisecond(0);
-
-    // Вместо toISOString() используем формат с явным указанием времени
-    const appointmentTimeString = appointmentDateTime.format('YYYY-MM-DDTHH:mm:ss');
-
-    console.log('🕒 Московское время:', appointmentTimeString);
-    console.log('🕒 UTC время:', appointmentDateTime.toISOString());
-
-    const appointmentData = {
-      user_id: user.id,
-      psychologist_name: selectedPsychologist,
-      appointment_time: appointmentTimeString, // Локальное время без Z
-      notes: notes || ""
-    };
-
-    console.log('📝 Отправляем данные:', appointmentData);
-
-    const response = await fetch('/api/psychologists/appointments', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(appointmentData),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Appointment creation error: ${response.status} - ${errorText}`);
+  const createAppointment = async () => {
+    if (!selectedPsychologist || !selectedDate || !selectedTime) {
+      message.error('Пожалуйста, заполните все поля');
+      return;
     }
 
-    const result = await response.json();
-    
-    if (result.success) {
-      message.success('Запись успешно создана!');
-      setIsModalVisible(false);
-      resetForm();
-      fetchUserAppointments();
-    } else {
-      throw new Error(result.message);
+    try {
+      setLoading(true);
+
+      // Формируем дату-время в московском часовом поясе
+      const [hours, minutes] = selectedTime.split(':').map(Number);
+
+      const appointmentDateTime = selectedDate
+        .hour(hours)
+        .minute(minutes)
+        .second(0)
+        .millisecond(0);
+
+      // Вместо toISOString() используем формат с явным указанием времени
+      const appointmentTimeString = appointmentDateTime.format('YYYY-MM-DDTHH:mm:ss');
+
+      console.log('🕒 Московское время:', appointmentTimeString);
+      console.log('🕒 UTC время:', appointmentDateTime.toISOString());
+
+      const appointmentData = {
+        user_id: user.id,
+        psychologist_name: selectedPsychologist,
+        appointment_time: appointmentTimeString, // Локальное время без Z
+        notes: notes || ""
+      };
+
+      console.log('📝 Отправляем данные:', appointmentData);
+
+      const response = await fetch('/api/psychologists/appointments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(appointmentData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Appointment creation error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        message.success('Запись успешно создана!');
+        setIsModalVisible(false);
+        resetForm();
+        fetchUserAppointments();
+      } else {
+        throw new Error(result.message);
+      }
+
+    } catch (error) {
+      console.error('❌ Ошибка создания записи:', error);
+      message.error(error.message || 'Ошибка создания записи');
+    } finally {
+      setLoading(false);
     }
-    
-  } catch (error) {
-    console.error('❌ Ошибка создания записи:', error);
-    message.error(error.message || 'Ошибка создания записи');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const resetForm = () => {
     setSelectedPsychologist(null);
@@ -253,42 +253,42 @@ const createAppointment = async () => {
     setAvailableDates([]);
   };
 
-const formatAppointmentDate = (dateString, timeString) => {
-  try {
-    // Если timeString уже в формате ISO (содержит T или Z), парсим его
-    if (timeString.includes('T') || timeString.includes('Z')) {
-      const fullDateTime = dayjs(timeString);
-      return fullDateTime.format('DD.MM.YYYY в HH:mm');
-    }
-    
-    // Если timeString просто время (например, "14:00"), комбинируем с dateString
-    const date = dayjs(dateString);
-    const fullDateTime = dayjs(`${dateString}T${timeString}`);
-    return fullDateTime.format('DD.MM.YYYY в HH:mm');
-    
-  } catch (error) {
-    console.error('❌ Ошибка форматирования даты:', error);
-    return `${dateString} в ${timeString}`; // fallback
-  }
-};
+  const formatAppointmentDate = (dateString, timeString) => {
+    try {
+      // Если timeString уже в формате ISO (содержит T или Z), парсим его
+      if (timeString.includes('T') || timeString.includes('Z')) {
+        const fullDateTime = dayjs(timeString);
+        return fullDateTime.format('DD.MM.YYYY в HH:mm');
+      }
 
-const formatTimeForDisplay = (timeString) => {
-  try {
-    if (timeString.includes('T') || timeString.includes('Z')) {
-      return dayjs(timeString).format('HH:mm');
+      // Если timeString просто время (например, "14:00"), комбинируем с dateString
+      const date = dayjs(dateString);
+      const fullDateTime = dayjs(`${dateString}T${timeString}`);
+      return fullDateTime.format('DD.MM.YYYY в HH:mm');
+
+    } catch (error) {
+      console.error('❌ Ошибка форматирования даты:', error);
+      return `${dateString} в ${timeString}`; // fallback
     }
-    // Если время уже в формате "14:00", возвращаем как есть
-    return timeString;
-  } catch (error) {
-    console.error('❌ Ошибка форматирования времени:', error);
-    return timeString;
-  }
-};
+  };
+
+  const formatTimeForDisplay = (timeString) => {
+    try {
+      if (timeString.includes('T') || timeString.includes('Z')) {
+        return dayjs(timeString).format('HH:mm');
+      }
+      // Если время уже в формате "14:00", возвращаем как есть
+      return timeString;
+    } catch (error) {
+      console.error('❌ Ошибка форматирования времени:', error);
+      return timeString;
+    }
+  };
 
   // Функция для определения доступных дат в календаре
   const isDateAvailable = (current) => {
     if (!current || !selectedPsychologist) return false;
-    
+
     const dateString = current.format('YYYY-MM-DD');
     return availableDates.includes(dateString);
   };
@@ -330,7 +330,7 @@ const formatTimeForDisplay = (timeString) => {
   };
 
   return (
-    <App>
+    <>
       <Container>
         <CellList
           filled
@@ -339,10 +339,11 @@ const formatTimeForDisplay = (timeString) => {
             <CellHeader titleStyle="caps">
               <Flex direction="row" align="center" justify="space-between">
                 <span>Запись к психологу</span>
+
                 <Button
                   type="link"
                   onClick={() => setIsModalVisible(true)}
-                  style={{ fontSize: '12px' }}
+                  style={{ fontSize: "12px" }}
                 >
                   Новая запись
                 </Button>
@@ -351,7 +352,9 @@ const formatTimeForDisplay = (timeString) => {
           }
         >
           {appointmentsLoading ? (
-            <CellSimple><Spinner /></CellSimple>
+            <CellSimple>
+              <Spinner />
+            </CellSimple>
           ) : userAppointments.length > 0 ? (
             userAppointments.map((appointment, index) => (
               <CellSimple
@@ -362,8 +365,11 @@ const formatTimeForDisplay = (timeString) => {
                   </Tag>
                 }
                 title={appointment.psychologist_name}
-                subtitle={formatAppointmentDate(appointment.appointment_date, appointment.appointment_time)}
-              ></CellSimple>
+                subtitle={formatAppointmentDate(
+                  appointment.appointment_date,
+                  appointment.appointment_time
+                )}
+              />
             ))
           ) : (
             <CellSimple>
@@ -371,7 +377,7 @@ const formatTimeForDisplay = (timeString) => {
               <Button
                 type="link"
                 onClick={() => setIsModalVisible(true)}
-                style={{ marginTop: '10px' }}
+                style={{ marginTop: "10px" }}
               >
                 Записаться
               </Button>
@@ -387,50 +393,55 @@ const formatTimeForDisplay = (timeString) => {
           setIsModalVisible(false);
           resetForm();
         }}
-        width={600}
         footer={[
-          <Button key="cancel" onClick={() => {
-            setIsModalVisible(false);
-            resetForm();
-          }}>
+          <Button
+            key="cancel"
+            onClick={() => {
+              setIsModalVisible(false);
+              resetForm();
+            }}
+          >
             Отмена
           </Button>,
-          <Button 
-            key="submit" 
-            type="primary" 
+
+          <Button
+            key="submit"
+            type="primary"
             loading={loading}
             onClick={createAppointment}
             disabled={!selectedPsychologist || !selectedDate || !selectedTime}
           >
             Записаться
-          </Button>,
+          </Button>
         ]}
       >
         <Flex direction="column" gap={4}>
-          <div>
-            <label style={{ fontWeight: '500', marginBottom: '8px', display: 'block' }}>
-              Психолог:
-            </label>
+          {/* ПСИХОЛОГ */}
+          <Flex direction="column" gap={1}>
+            <span style={{ fontWeight: 500 }}>Психолог:</span>
+
             <Select
-              style={{ width: '100%' }}
+              style={{ width: "100%" }}
               placeholder="Выберите психолога"
               value={selectedPsychologist}
               onChange={handlePsychologistChange}
               size="large"
             >
-              {PSYCHOLOGISTS.map(name => (
-                <Option key={name} value={name}>{name}</Option>
+              {PSYCHOLOGISTS.map((name) => (
+                <Option key={name} value={name}>
+                  {name}
+                </Option>
               ))}
             </Select>
-          </div>
+          </Flex>
 
+          {/* ДАТА */}
           {selectedPsychologist && (
-            <div>
-              <label style={{ fontWeight: '500', marginBottom: '8px', display: 'block' }}>
-                Дата приема:
-              </label>
+            <Flex direction="column" gap={1}>
+              <span style={{ fontWeight: 500 }}>Дата приема:</span>
+
               <DatePicker
-                style={{ width: '100%' }}
+                style={{ width: "100%" }}
                 placeholder="Выберите дату"
                 value={selectedDate}
                 onChange={handleDateChange}
@@ -439,41 +450,41 @@ const formatTimeForDisplay = (timeString) => {
                 size="large"
                 allowClear={false}
               />
-              <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+
+              <span style={{ fontSize: 12, color: "#666" }}>
                 Доступны только даты, когда психолог принимает
-              </div>
-            </div>
+              </span>
+            </Flex>
           )}
 
+          {/* ВРЕМЯ */}
           {selectedDate && (
-            <div>
-              <label style={{ fontWeight: '500', marginBottom: '8px', display: 'block' }}>
-                Время приема:
-              </label>
+            <Flex direction="column" gap={1}>
+              <span style={{ fontWeight: 500 }}>Время приема:</span>
               {loading ? (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
+                <Flex align="center" justify="center" style={{ padding: 20 }}>
                   <Spinner />
-                </div>
+                </Flex>
               ) : (
                 renderTimeSlots()
               )}
-            </div>
+            </Flex>
           )}
 
-          <div>
-            <label style={{ fontWeight: '500', marginBottom: '8px', display: 'block' }}>
-              Примечание (необязательно):
-            </label>
+          {/* ПРИМЕЧАНИЕ */}
+          <Flex direction="column" gap={1}>
+            <span style={{ fontWeight: 500 }}>Примечание (необязательно):</span>
+
             <TextArea
-              placeholder="Дополнительная информация, которую стоит знать психологу..."
+              placeholder="Дополнительная информация..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              style={{ resize: 'vertical' }}
+              style={{ resize: "vertical" }}
             />
-          </div>
+          </Flex>
         </Flex>
       </Modal>
-    </App>
+    </>
   );
 }

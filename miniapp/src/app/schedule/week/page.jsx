@@ -173,14 +173,14 @@ export default function SchedulePage() {
       title: classItem.subject || 'Не указано',
       description: `${classItem.type || ''}${classItem.timeRange ? ` • ${classItem.timeRange}` : ''}${classItem.building ? `, ${classItem.building}` : ''}${classItem.location ? `, ${classItem.location}` : ''}`,
       subTitle: classItem.pairNumber ? `${classItem.pairNumber}` : '',
-      status: "wait"
+      status: "process"
     }));
   };
 
   const getTabTitle = (tabKey) => {
     const titles = {
       'today': 'сегодня',
-      'tomorrow': 'завтра', 
+      'tomorrow': 'завтра',
       'yesterday': 'вчера',
       'week': 'неделю'
     };
@@ -192,13 +192,13 @@ export default function SchedulePage() {
     if (activeTab === 'week') {
       return `${baseTitle} на неделю ${scheduleData?.week ? `(неделя ${scheduleData.week})` : ''}`;
     }
-    
+
     // Для дней (today/tomorrow/yesterday) используем данные из schedule.schedule
     if (scheduleData?.schedule) {
       const dayInfo = scheduleData.schedule;
       return `${baseTitle} на ${getTabTitle(activeTab)} (${dayInfo.date_dd_mm}, ${dayInfo.day_name})`;
     }
-    
+
     return `${baseTitle} на ${getTabTitle(activeTab)}`;
   };
 
@@ -231,7 +231,6 @@ export default function SchedulePage() {
           <Button
             type="link"
             onClick={updateScheduleFromParser}
-            style={{ marginTop: '10px' }}
             disabled={scheduleLoading}
           >
             Загрузить из ГУАП
@@ -243,21 +242,24 @@ export default function SchedulePage() {
     if (activeTab === 'week') {
       // Рендерим недельное расписание
       const days = getClassesForDay();
-      
+
       if (days.length === 0) {
         return <CellSimple>На неделю занятий нет</CellSimple>;
       }
 
       return days.map((day, dayIndex) => (
         <div key={dayIndex}>
-          <CellSimple
-            title={`${day.dayName}, ${day.date}`}
-            titleStyle="bold"
-            style={{ backgroundColor: '#f5f5f5' }}
+          <CellList
+
           />
           {day.classes && day.classes.length > 0 ? (
-            <CellSimple showChevron>
+            <CellSimple
+              // title={}
+              after={`${day.dayName}, ${day.date}`}
+
+            >
               <Steps
+                status="process"
                 direction="vertical"
                 items={formatDaySchedule(day.classes)}
               />
@@ -271,7 +273,7 @@ export default function SchedulePage() {
     } else {
       // Рендерим расписание на день (today/tomorrow/yesterday)
       const classes = getClassesForDay();
-      
+
       if (!Array.isArray(classes)) {
         console.error('❌ Classes не является массивом:', classes);
         return <CellSimple>Ошибка формата данных</CellSimple>;
@@ -306,7 +308,7 @@ export default function SchedulePage() {
       label: 'Завтра',
     },
     {
-      key: 'yesterday', 
+      key: 'yesterday',
       label: 'Вчера',
     },
     {
@@ -326,14 +328,14 @@ export default function SchedulePage() {
   }
 
   return (
-    <Panel mode="secondary" className="wrap">
+    <Panel mode="primary" className="wrap">
       {contextHolder}
       <Flex direction="column" align="stretch" gap={5}>
         <Container>
-          <Flex justify="space-between" align="center" style={{ marginBottom: '10px' }}>
-            <Button onClick={handleBack}>Назад</Button>
-            <Button 
-              onClick={updateScheduleFromParser} 
+          <Flex justify="space-between" align="center">
+            <Button mode="secondary" onClick={handleBack}>Назад</Button>
+            <Button
+              onClick={updateScheduleFromParser}
               disabled={scheduleLoading}
             >
               {scheduleLoading ? <Spinner /> : 'Обновить'}
@@ -345,7 +347,6 @@ export default function SchedulePage() {
             activeKey={activeTab}
             onChange={setActiveTab}
             items={tabItems}
-            style={{ marginBottom: '20px' }}
           />
 
           {/* Расписание */}

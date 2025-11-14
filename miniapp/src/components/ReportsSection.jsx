@@ -108,14 +108,7 @@ const ReportsSection = ({ reports, reportsLoading, onUpdateReports }) => {
         <CellHeader titleStyle="caps">
           <Flex direction="row" align="center" justify="space-between">
             <span>Отчеты</span>
-            <Button
-              type="link"
-              onClick={onUpdateReports}
-              disabled={reportsLoading}
-              style={{ fontSize: '12px' }}
-            >
-              {reportsLoading ? <Spinner /> : 'Обновить'}
-            </Button>
+
           </Flex>
         </CellHeader>
       }

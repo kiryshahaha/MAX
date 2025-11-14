@@ -73,14 +73,7 @@ const DeadlinesSection = ({ tasks, tasksLoading, onUpdateDeadlines }) => {
         <CellHeader titleStyle="caps">
           <Flex direction="row" align="center" justify="space-between">
             <span>Ближайшие дедлайны</span>
-            <Button
-              type="link"
-              onClick={onUpdateDeadlines}
-              disabled={tasksLoading}
-              style={{ fontSize: '12px' }}
-            >
-              {tasksLoading ? <Spinner /> : 'Обновить'}
-            </Button>
+
           </Flex>
         </CellHeader>
       }

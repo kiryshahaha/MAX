@@ -51,46 +51,46 @@ export default function MainPage() {
   }, []);
 
   const checkAuth = async () => {
-  try {
-    const { data: { session }, error } = await supabase.auth.getSession();
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
 
-    if (error || !session) {
-      console.log('❌ Нет активной сессии, перенаправляем на авторизацию');
+      if (error || !session) {
+        console.log('❌ Нет активной сессии, перенаправляем на авторизацию');
+        router.replace('/auth');
+        return;
+      }
+
+      setUser(session.user);
+      setAuthChecked(true);
+
+      setInitialLoadProgress({
+        schedule: false,
+        tasks: false,
+        reports: false
+      });
+
+      console.log('🔄 Последовательная загрузка данных...');
+
+      // 1. Расписание
+      await fetchTodaySchedule(session.user.id, true);
+      await new Promise(resolve => setTimeout(resolve, 500)); // небольшая пауза
+
+      // 2. Задачи
+      await fetchTasks(session.user.id, false, true);
+      await new Promise(resolve => setTimeout(resolve, 500)); // небольшая пауза
+
+      // 3. Отчеты
+      await fetchReports(session.user.id, false, true);
+
+      console.log('✅ Все данные загружены последовательно');
+
+    } catch (error) {
+      console.error('Auth check error:', error);
       router.replace('/auth');
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    setUser(session.user);
-    setAuthChecked(true);
-
-    setInitialLoadProgress({
-      schedule: false,
-      tasks: false,
-      reports: false
-    });
-
-    console.log('🔄 Последовательная загрузка данных...');
-    
-    // 1. Расписание
-    await fetchTodaySchedule(session.user.id, true);
-    await new Promise(resolve => setTimeout(resolve, 500)); // небольшая пауза
-    
-    // 2. Задачи
-    await fetchTasks(session.user.id, false, true);
-    await new Promise(resolve => setTimeout(resolve, 500)); // небольшая пауза
-    
-    // 3. Отчеты
-    await fetchReports(session.user.id, false, true);
-
-    console.log('✅ Все данные загружены последовательно');
-
-  } catch (error) {
-    console.error('Auth check error:', error);
-    router.replace('/auth');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const fetchReports = async (userId, forceUpdate = false, isInitialLoad = false) => {
     if (reportsLoading && !isInitialLoad) {
@@ -102,7 +102,7 @@ export default function MainPage() {
       if (!isInitialLoad) {
         setReportsLoading(true);
       }
-      
+
       console.log('📋 Запрашиваем отчеты для пользователя:', userId, { forceUpdate });
 
       if (forceUpdate) {
@@ -120,8 +120,16 @@ export default function MainPage() {
       const reportsData = await reportsResponse.json();
       console.log('📊 Ответ от reports API:', reportsData);
 
+      // Исправленная логика проверки источника данных
       if (reportsData.success && reportsData.reports && reportsData.reports_count > 0) {
-        console.log('✅ Используем отчеты из бэкенда');
+        if (reportsData.source === 'supabase') {
+          console.log('✅ Используем актуальные отчеты из Supabase');
+        } else if (reportsData.source === 'parser') {
+          console.log('🔄 Используем обновленные отчеты из парсера');
+        } else {
+          console.log('✅ Используем отчеты из API');
+        }
+
         setReports(reportsData.reports);
         if (isInitialLoad) {
           setInitialLoadProgress(prev => ({ ...prev, reports: true }));
@@ -228,7 +236,7 @@ export default function MainPage() {
       if (!isInitialLoad) {
         setScheduleLoading(true);
       }
-      
+
       console.log('📅 Запрашиваем расписание для пользователя:', userId);
 
       const scheduleResponse = await fetch(`/api/schedule/today?uid=${userId}`);
@@ -354,7 +362,7 @@ export default function MainPage() {
       if (!isInitialLoad) {
         setTasksLoading(true);
       }
-      
+
       console.log('📝 Запрашиваем задачи для пользователя:', userId, { forceUpdate });
 
       if (forceUpdate) {
@@ -372,8 +380,16 @@ export default function MainPage() {
       const tasksData = await tasksResponse.json();
       console.log('📊 Ответ от tasks API:', tasksData);
 
+      // Исправленная логика проверки источника данных
       if (tasksData.success && tasksData.tasks && tasksData.tasks_count > 0) {
-        console.log('✅ Используем задачи из бэкенда');
+        if (tasksData.source === 'supabase') {
+          console.log('✅ Используем актуальные задачи из Supabase');
+        } else if (tasksData.source === 'parser') {
+          console.log('🔄 Используем обновленные задачи из парсера');
+        } else {
+          console.log('✅ Используем задачи из API');
+        }
+
         setTasks(tasksData.tasks);
         if (isInitialLoad) {
           setInitialLoadProgress(prev => ({ ...prev, tasks: true }));
@@ -470,55 +486,7 @@ export default function MainPage() {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        localStorage.removeItem('guap_password');
-        sessionStorage.clear();
-        router.replace('/auth');
-        return;
-      }
-
-      const username = session.user.user_metadata?.original_username || session.user.user_metadata?.username;
-
-      const logoutResponse = await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username }),
-      });
-
-      if (!logoutResponse.ok) {
-        const errorText = await logoutResponse.text();
-        throw new Error(`Logout API error: ${logoutResponse.status} - ${errorText}`);
-      }
-
-      const logoutData = await logoutResponse.json();
-
-      if (logoutData.success) {
-        localStorage.removeItem('guap_password');
-        localStorage.clear();
-        sessionStorage.clear();
-        
-        await supabase.auth.signOut();
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        window.location.href = '/auth';
-      } else {
-        throw new Error(logoutData.message);
-      }
-
-    } catch (error) {
-      console.error('Logout error:', error);
-      localStorage.removeItem('guap_password');
-      localStorage.clear();
-      sessionStorage.clear();
-      window.location.href = '/auth';
-    }
-  };
+  
 
   const handleUpdateDeadlines = async () => {
     if (tasksLoading) return;
@@ -537,14 +505,8 @@ export default function MainPage() {
   // Показываем загрузку пока проверяем авторизацию
   if (loading || (authChecked && !isInitialLoadComplete())) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh',
-        flexDirection: 'column',
-        gap: '16px'
-      }}>
+      <Flex className="wrap" align="center"
+        justify="center" direction="column">
         <Spinner />
         <div>Загрузка данных...</div>
         <div style={{ fontSize: '12px', color: '#666' }}>
@@ -552,7 +514,7 @@ export default function MainPage() {
           {!initialLoadProgress.tasks && 'Задачи... '}
           {!initialLoadProgress.reports && 'Отчеты...'}
         </div>
-      </div>
+      </Flex>
     );
   }
 
@@ -565,10 +527,6 @@ export default function MainPage() {
       {contextHolder}
       <Flex direction="column" align="stretch" gap={5}>
         <Container>
-          <Flex justify="end" style={{ marginBottom: '10px' }}>
-            <Button onClick={handleLogout}>Выйти</Button>
-          </Flex>
-
           <ScheduleSection
             todaySchedule={todaySchedule}
             scheduleLoading={scheduleLoading}
@@ -595,7 +553,7 @@ export default function MainPage() {
           <Divider />
 
           <PsychologistBooking user={user} />
-          
+
           <Divider />
 
           <NotificationsSection />

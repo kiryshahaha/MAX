@@ -57,20 +57,20 @@ export default function ProfilePage() {
 
       const userId = session.user.id;
       console.log('Запрашиваем профиль для пользователя:', userId);
-      
+
       const response = await fetch(`/api/profile?uid=${userId}`);
-      
+
       if (!response.ok) {
         throw new Error(`Ошибка загрузки профиля: ${response.status}`);
       }
 
       const data = await response.json();
       console.log('Получены данные профиля:', data);
-      
+
       if (data.success) {
         console.log('Профиль успешно загружен, структура:', data.profile);
         setProfile(data.profile);
-        
+
         // Автоматически запускаем парсер если профиль пустой И мы еще не пытались
         if (isEmptyProfile(data.profile) && !autoUpdateAttempted) {
           console.log('Профиль пустой, запускаем автоматическое обновление...');
@@ -88,7 +88,7 @@ export default function ProfilePage() {
 
     } catch (err) {
       console.error('Ошибка загрузки профиля:', err);
-      
+
       // При ошибке тоже пробуем автоматическое обновление (только один раз)
       if (!autoUpdateAttempted) {
         console.log('Ошибка загрузки, пробуем автоматическое обновление...');
@@ -101,34 +101,82 @@ export default function ProfilePage() {
       setLoading(false);
     }
   };
+  const handleLogout = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        localStorage.removeItem('guap_password');
+        sessionStorage.clear();
+        router.replace('/auth');
+        return;
+      }
 
+      const username = session.user.user_metadata?.original_username || session.user.user_metadata?.username;
+
+      const logoutResponse = await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username }),
+      });
+
+      if (!logoutResponse.ok) {
+        const errorText = await logoutResponse.text();
+        throw new Error(`Logout API error: ${logoutResponse.status} - ${errorText}`);
+      }
+
+      const logoutData = await logoutResponse.json();
+
+      if (logoutData.success) {
+        localStorage.removeItem('guap_password');
+        localStorage.clear();
+        sessionStorage.clear();
+
+        await supabase.auth.signOut();
+
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        window.location.href = '/auth';
+      } else {
+        throw new Error(logoutData.message);
+      }
+
+    } catch (error) {
+      console.error('Logout error:', error);
+      localStorage.removeItem('guap_password');
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = '/auth';
+    }
+  };
   // Проверяем, пустой ли профиль
   const isEmptyProfile = (profileData) => {
     if (!profileData) {
       console.log('Профиль пустой: profileData is null');
       return true;
     }
-    
+
     console.log('Проверяем структуру профиля:', profileData);
-    
+
     // Если профиль в новой структуре (из парсера)
     if (profileData.personal_info) {
-      const isEmpty = !profileData.personal_info.full_name && 
-                     !profileData.academic_info?.group;
-      console.log('Проверка новой структуры:', { 
+      const isEmpty = !profileData.personal_info.full_name &&
+        !profileData.academic_info?.group;
+      console.log('Проверка новой структуры:', {
         full_name: profileData.personal_info.full_name,
         group: profileData.academic_info?.group,
-        isEmpty 
+        isEmpty
       });
       return isEmpty;
     }
-    
+
     // Если профиль в старой структуре
     const isEmpty = !profileData.fullName && !profileData.group;
-    console.log('Проверка старой структуры:', { 
+    console.log('Проверка старой структуры:', {
       fullName: profileData.fullName,
       group: profileData.group,
-      isEmpty 
+      isEmpty
     });
     return isEmpty;
   };
@@ -146,9 +194,9 @@ export default function ProfilePage() {
       }
 
       const userId = session.user.id;
-      const username = session.user.user_metadata?.guap_username || 
-                      session.user.user_metadata?.original_username || 
-                      session.user.user_metadata?.username;
+      const username = session.user.user_metadata?.guap_username ||
+        session.user.user_metadata?.original_username ||
+        session.user.user_metadata?.username;
       const password = localStorage.getItem('guap_password');
 
       if (!username || !password) {
@@ -157,19 +205,19 @@ export default function ProfilePage() {
       }
 
       console.log('Автоматическое обновление профиля через парсер...');
-      
+
       const response = await fetch('/api/profile/update', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          username, 
-          password, 
-          uid: userId 
+        body: JSON.stringify({
+          username,
+          password,
+          uid: userId
         }),
       });
-      
+
       if (!response.ok) {
         console.error('Ошибка автоматического обновления профиля:', response.status);
         // НЕ устанавливаем ошибку - пробуем загрузить существующий профиль
@@ -179,7 +227,7 @@ export default function ProfilePage() {
 
       const data = await response.json();
       console.log('Данные после автоматического обновления:', data);
-      
+
       if (data.success) {
         setProfile(data.profile);
         console.log('Профиль автоматически обновлен');
@@ -206,7 +254,7 @@ export default function ProfilePage() {
 
       const userId = session.user.id;
       const response = await fetch(`/api/profile?uid=${userId}`);
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.profile) {
@@ -231,9 +279,9 @@ export default function ProfilePage() {
       }
 
       const userId = session.user.id;
-      const username = session.user.user_metadata?.guap_username || 
-                      session.user.user_metadata?.original_username || 
-                      session.user.user_metadata?.username;
+      const username = session.user.user_metadata?.guap_username ||
+        session.user.user_metadata?.original_username ||
+        session.user.user_metadata?.username;
       const password = localStorage.getItem('guap_password');
 
       if (!username || !password) {
@@ -246,20 +294,20 @@ export default function ProfilePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          username, 
-          password, 
-          uid: userId 
+        body: JSON.stringify({
+          username,
+          password,
+          uid: userId
         }),
       });
-      
+
       if (!response.ok) {
         throw new Error(`Ошибка обновления профиля: ${response.status}`);
       }
 
       const data = await response.json();
       console.log('Данные после ручного обновления:', data);
-      
+
       if (data.success) {
         setProfile(data.profile);
         console.log('Профиль успешно обновлен');
@@ -313,15 +361,15 @@ export default function ProfilePage() {
       studentId: profile.personal_info?.student_id || 'Не указано',
       direction: profile.program_info?.direction || 'Не указано',
       institute: profile.program_info?.institute || 'Не указано',
-      specialty: profile.program_info?.specialty?.name || 
-                profile.program_info?.specialty?.full_name || 
-                'Не указано',
+      specialty: profile.program_info?.specialty?.name ||
+        profile.program_info?.specialty?.full_name ||
+        'Не указано',
       educationForm: profile.academic_info?.education_form || 'Не указано',
       educationLevel: profile.academic_info?.education_level || 'Не указано',
       enrollmentOrder: profile.academic_info?.enrollment_order || 'Не указано',
-      email: profile.contacts?.primary_email || 
-             profile.contacts?.secondary_email || 
-             'Не указано',
+      email: profile.contacts?.primary_email ||
+        profile.contacts?.secondary_email ||
+        'Не указано',
       phone: profile.contacts?.phone || 'Не указано',
       photoUrl: profile.personal_info?.photo_url || null
     };
@@ -446,13 +494,13 @@ export default function ProfilePage() {
           >
             <CellAction
               height="compact"
-              onClick={() => {}}
+              onClick={() => { }}
             >
               {profileData.phone}
             </CellAction>
             <CellAction
               height="compact"
-              onClick={() => {}}
+              onClick={() => { }}
             >
               {profileData.email}
             </CellAction>
@@ -498,8 +546,7 @@ export default function ProfilePage() {
           <CellList mode="island">
             <CellSimple
               showChevron
-              // before={<Icon24Placeholder />}
-              onClick={() => {}}
+              onClick={() => { }}
               title="Успеваемость"
               after={
                 <Counter
@@ -511,8 +558,10 @@ export default function ProfilePage() {
             />
           </CellList>
         </Flex>
-
-        {/* Действия */}
+        <Container >
+          <Button onClick={handleLogout} size="small">Выйти</Button>
+        </Container>
+        {/* Действия
         <Container
         style={{width: '100%'}}
         >
@@ -526,7 +575,7 @@ export default function ProfilePage() {
           >
             {updating ? <Spinner /> : 'Обновить данные'}
           </Button>
-        </Container>
+        </Container> */}
       </Flex>
     </Panel>
   );

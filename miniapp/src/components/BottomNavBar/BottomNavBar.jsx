@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import styles from "./BottomNavBar.module.css";
-import { CircleUser, ScanFace, ToolCase } from "lucide-react";
+import { CircleUser, ScanFace, ToolCase, Calendar } from "lucide-react";
 import { useEffect, useState } from "react";
 import { clientSupabase as supabase } from "../../../lib/supabase-client";
 
@@ -14,7 +14,7 @@ export default function BottomNavBar() {
 
   useEffect(() => {
     checkAuth();
-    
+
     // Слушаем изменения авторизации
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
@@ -38,6 +38,7 @@ export default function BottomNavBar() {
   // Базовые элементы навигации для авторизованных пользователей
   const authNavItems = [
     { name: "Главная", href: "/main", Icon: ToolCase },
+    { name: "Расписание", href: "/schedule/week", Icon: Calendar },
     { name: "Профиль", href: user ? `/profile/${user.id}` : "/auth", Icon: CircleUser },
   ];
 
