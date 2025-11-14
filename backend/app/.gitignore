@@ -1,4 +1,3 @@
-@"
 # Корневые зависимости
 /node_modules
 
@@ -6,7 +5,12 @@
 /.next/
 /out/
 
+# Python виртуальное окружение
 /backend/app/myenv/
+myenv/
+venv/
+env/
+ENV/
 
 # Production
 /build
@@ -15,6 +19,7 @@
 # Environment files
 .env.local
 .env.production
+.env
 
 # Logs
 *.log
@@ -29,4 +34,30 @@
 
 # Coverage
 /coverage
-"@ | Out-File -FilePath .gitignore -Encoding UTF8
+
+# Python
+*.pyc
+__pycache__/
+*.so
+.Python
+
+# Database
+*.db
+*.sqlite3
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# PyCharm
+.idea/
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+
+# Backup files
+*.bak
+*.backup
