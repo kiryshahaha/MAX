@@ -8,10 +8,11 @@ RUN npm install --legacy-peer-deps
 
 COPY . .
 
+# Отключаем телеметрию
+ENV NEXT_TELEMETRY_DISABLED=1
+
 RUN npm run build
 
-# Указываем порт который слушает приложение
 EXPOSE 5173
 
-# Запускаем продакшен сервер
 CMD ["npm", "start"]
