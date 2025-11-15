@@ -22,7 +22,6 @@ import {
 } from "@maxhub/max-ui";
 import React, { useEffect, useState } from "react";
 
-// Mock данные из JSON
 const universityData = {
   university: {
     name: "Санкт-Петербургский государственный университет аэрокосмического приборостроения (ГУАП)",
@@ -123,7 +122,6 @@ export default function UniversityDashboard() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
-  // Форматирование чисел
   const formatNumber = (num) => {
     return new Intl.NumberFormat('ru-RU').format(num);
   };
@@ -132,7 +130,6 @@ export default function UniversityDashboard() {
     return `${num}%`;
   };
 
-  // Основные метрики для главного экрана
   const KeyMetricsCard = () => (
 
 
@@ -163,7 +160,6 @@ export default function UniversityDashboard() {
     </CellList>
   );
 
-  // Карточка качества образования
   const QualityMetricsCard = () => (
 
 
@@ -195,7 +191,6 @@ export default function UniversityDashboard() {
 
   );
 
-  // Список институтов
   const InstitutesList = () => (
 
 
@@ -223,7 +218,6 @@ export default function UniversityDashboard() {
 
   );
 
-  // Распределение студентов
   const StudentDistributionCard = () => (
 
     <CellList
@@ -253,8 +247,6 @@ export default function UniversityDashboard() {
     </CellList>
 
   );
-
-  // Международные студенты
   const InternationalStudentsCard = () => (
 
 
@@ -287,7 +279,6 @@ export default function UniversityDashboard() {
 
   );
 
-  // Проблемные зоны
   const ProblemAreasCard = () => (
 
 

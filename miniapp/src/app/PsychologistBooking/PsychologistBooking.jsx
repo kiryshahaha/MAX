@@ -1,4 +1,3 @@
-// components/PsychologistBooking.jsx
 "use client";
 import { useState, useEffect } from "react";
 import {
@@ -35,14 +34,12 @@ export default function PsychologistBooking({ user }) {
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
   const [availableDates, setAvailableDates] = useState([]);
 
-  // Загружаем записи пользователя
   useEffect(() => {
     if (user) {
       fetchUserAppointments();
     }
   }, [user]);
 
-  // Загружаем доступные даты при выборе психолога
   useEffect(() => {
     if (selectedPsychologist) {
       fetchAvailableDates(selectedPsychologist);
@@ -68,7 +65,6 @@ export default function PsychologistBooking({ user }) {
         throw new Error(data.message);
       }
     } catch (error) {
-      console.error('❌ Ошибка загрузки записей:', error);
       message.error('Ошибка загрузки ваших записей');
       setUserAppointments([]);
     } finally {
@@ -76,13 +72,11 @@ export default function PsychologistBooking({ user }) {
     }
   };
 
-  // Функция для получения доступных дат (проверяем ближайшие 30 дней)
   const fetchAvailableDates = async (psychologist) => {
     try {
       const dates = [];
       const today = dayjs();
 
-      // Проверяем доступность на ближайшие 30 дней
       for (let i = 0; i < 30; i++) {
         const date = today.add(i, 'day');
         const dateString = date.format('YYYY-MM-DD');
@@ -99,13 +93,11 @@ export default function PsychologistBooking({ user }) {
             }
           }
         } catch (error) {
-          console.error(`Ошибка проверки даты ${dateString}:`, error);
         }
       }
 
       setAvailableDates(dates);
     } catch (error) {
-      console.error('❌ Ошибка получения доступных дат:', error);
       setAvailableDates([]);
     }
   };
@@ -128,29 +120,23 @@ export default function PsychologistBooking({ user }) {
       const data = await response.json();
 
       if (data.success) {
-        // Преобразуем слоты в читаемый формат и фильтруем по рабочим часам
         const formattedSlots = data.available_slots
           .map(slot => {
             if (typeof slot === 'string' && slot.includes('T')) {
-              // Если слот в формате "2025-11-18T16:00:00", извлекаем время
               return dayjs(slot).format('HH:mm');
             }
-            return slot; // Если уже в формате "16:00"
+            return slot; 
           })
           .filter(slot => {
-            // Фильтруем слоты, которые входят в рабочие часы психолога
-            // Для Клепова Дмитрия Олеговича: с 11:00 до 16:00
             const hour = parseInt(slot.split(':')[0]);
-            return hour >= 11 && hour < 16; // с 11:00 до 15:59
+            return hour >= 11 && hour < 16;
           });
 
-        console.log('🕒 Доступные слоты после фильтрации:', formattedSlots);
         setAvailableSlots(formattedSlots);
       } else {
         throw new Error(data.message);
       }
     } catch (error) {
-      console.error('❌ Ошибка получения слотов:', error);
       message.error('Ошибка получения доступного времени');
       setAvailableSlots([]);
     } finally {
@@ -189,7 +175,6 @@ export default function PsychologistBooking({ user }) {
     try {
       setLoading(true);
 
-      // Формируем дату-время в московском часовом поясе
       const [hours, minutes] = selectedTime.split(':').map(Number);
 
       const appointmentDateTime = selectedDate
@@ -198,20 +183,16 @@ export default function PsychologistBooking({ user }) {
         .second(0)
         .millisecond(0);
 
-      // Вместо toISOString() используем формат с явным указанием времени
       const appointmentTimeString = appointmentDateTime.format('YYYY-MM-DDTHH:mm:ss');
 
-      console.log('🕒 Московское время:', appointmentTimeString);
-      console.log('🕒 UTC время:', appointmentDateTime.toISOString());
 
       const appointmentData = {
         user_id: user.id,
         psychologist_name: selectedPsychologist,
-        appointment_time: appointmentTimeString, // Локальное время без Z
+        appointment_time: appointmentTimeString, 
         notes: notes || ""
       };
 
-      console.log('📝 Отправляем данные:', appointmentData);
 
       const response = await fetch('/api/psychologists/appointments', {
         method: 'POST',
@@ -256,20 +237,17 @@ export default function PsychologistBooking({ user }) {
 
   const formatAppointmentDate = (dateString, timeString) => {
     try {
-      // Если timeString уже в формате ISO (содержит T или Z), парсим его
       if (timeString.includes('T') || timeString.includes('Z')) {
         const fullDateTime = dayjs(timeString);
         return fullDateTime.format('DD.MM.YYYY в HH:mm');
       }
 
-      // Если timeString просто время (например, "14:00"), комбинируем с dateString
       const date = dayjs(dateString);
       const fullDateTime = dayjs(`${dateString}T${timeString}`);
       return fullDateTime.format('DD.MM.YYYY в HH:mm');
 
     } catch (error) {
-      console.error('❌ Ошибка форматирования даты:', error);
-      return `${dateString} в ${timeString}`; // fallback
+      return `${dateString} в ${timeString}`; 
     }
   };
 
@@ -278,15 +256,12 @@ export default function PsychologistBooking({ user }) {
       if (timeString.includes('T') || timeString.includes('Z')) {
         return dayjs(timeString).format('HH:mm');
       }
-      // Если время уже в формате "14:00", возвращаем как есть
       return timeString;
     } catch (error) {
-      console.error('❌ Ошибка форматирования времени:', error);
       return timeString;
     }
   };
 
-  // Функция для определения доступных дат в календаре
   const isDateAvailable = (current) => {
     if (!current || !selectedPsychologist) return false;
 
@@ -294,7 +269,6 @@ export default function PsychologistBooking({ user }) {
     return availableDates.includes(dateString);
   };
 
-  // Функция для красивого отображения времени
  const renderTimeSlots = () => {
   if (availableSlots.length === 0) {
     return (
@@ -318,11 +292,9 @@ export default function PsychologistBooking({ user }) {
             textAlign: 'center',
             cursor: 'pointer',
             border: selectedTime === slot ? '2px solid #1890ff' : '1px solid #d9d9d9',
-            // background: selectedTime === slot ? '#f0f8ff' : '#fff',
             transition: 'all 0.3s',
             borderRadius: '6px',
             padding: '12px 8px',
-            // fontSize: '16px',
             fontWeight: '500'
           }}
           onClick={() => setSelectedTime(slot)}

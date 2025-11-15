@@ -1,4 +1,3 @@
-// server.js
 import express from 'express';
 import cors from 'cors';
 import { 
@@ -13,7 +12,7 @@ import { SessionManager } from './core/session-manager.js';
 
 setInterval(() => {
   SessionManager.cleanupExpiredSessions();
-}, 5 * 60 * 1000); // Каждые 5 минут
+}, 5 * 60 * 1000); 
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -23,13 +22,11 @@ app.use(express.json());
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('🛑 Received SIGINT. Cleaning up sessions...');
   await SessionManager.cleanupAllSessions();
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
-  console.log('🛑 Received SIGTERM. Cleaning up sessions...');
   await SessionManager.cleanupAllSessions();
   process.exit(0);
 });
@@ -45,16 +42,13 @@ app.post('/api/scrape/logout', async (req, res) => {
           await session.page.close();
           await session.browser.close();
         } catch (e) {
-          console.log('Ошибка при закрытии браузера:', e.message);
         }
         SessionManager.sessions.delete(username);
-        console.log(`✅ Сессия парсера закрыта для: ${username}`);
       }
     }
     
     res.json({ success: true, message: '✅ Сессии завершены' });
   } catch (error) {
-    console.error('Ошибка при выходе из парсера:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -99,7 +93,6 @@ app.post('/api/scrape/init-session', async (req, res) => {
       });
     }
 
-    console.log(`🔐 Инициализация сессии для пользователя: ${username}`);
     
     // Сначала проверяем существующую сессию
     const sessionActive = await SessionManager.isSessionActive(username);
@@ -131,7 +124,6 @@ app.post('/api/scrape/init-session', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Ошибка инициализации сессии:', error);
     res.status(500).json({
       success: false,
       message: `❌ Ошибка инициализации сессии: ${error.message}`
@@ -151,7 +143,6 @@ app.post('/api/scrape/check-session', async (req, res) => {
       });
     }
 
-    console.log(`🔍 Проверка сессии для пользователя: ${username}`);
     
     const sessionActive = await SessionManager.isSessionActive(username);
     
@@ -170,7 +161,6 @@ app.post('/api/scrape/check-session', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Ошибка проверки сессии:', error);
     res.status(500).json({
       success: false,
       message: `❌ Ошибка проверки сессии: ${error.message}`
@@ -197,12 +187,10 @@ app.post('/api/scrape/daily-schedule', async (req, res) => {
       });
     }
 
-    console.log(`Запрос на парсинг расписания за ${date} для пользователя: ${username}`);
     const result = await scrapeGuapDailySchedule({ username, password }, date);
     
     res.json(result);
   } catch (error) {
-    console.error('Ошибка в API парсера расписания на день:', error);
     res.status(500).json({
       success: false,
       message: `❌ Ошибка парсера расписания: ${error.message}`
@@ -222,12 +210,10 @@ app.post('/api/scrape/schedule', async (req, res) => {
       });
     }
 
-    console.log(`Запрос на парсинг расписания для пользователя: ${username}, год: ${year}, неделя: ${week}`);
     const result = await scrapeGuapSchedule({ username, password }, year, week);
     
     res.json(result);
   } catch (error) {
-    console.error('Ошибка в API парсера расписания:', error);
     res.status(500).json({
       success: false,
       message: `❌ Ошибка парсера расписания: ${error.message}`
@@ -247,12 +233,10 @@ app.post('/api/scrape/tasks', async (req, res) => {
       });
     }
 
-    console.log(`Запрос задач для пользователя: ${username}`);
     const result = await scrapeGuapTasks({ username, password });
     
     res.json(result);
   } catch (error) {
-    console.error('Ошибка в API парсера задач:', error);
     res.status(500).json({
       success: false,
       message: `❌ Ошибка парсера задач: ${error.message}`
@@ -271,12 +255,10 @@ app.post('/api/scrape/reports', async (req, res) => {
       });
     }
 
-    console.log(`Запрос на парсинг отчетов для пользователя: ${username}`);
     const result = await scrapeGuapReports({ username, password });
     
     res.json(result);
   } catch (error) {
-    console.error('Ошибка в API парсера отчетов:', error);
     res.status(500).json({
       success: false,
       message: `❌ Ошибка парсера отчетов: ${error.message}`
@@ -295,12 +277,10 @@ app.post('/api/scrape/profile', async (req, res) => {
       });
     }
 
-    console.log(`Запрос на парсинг профиля для пользователя: ${username}`);
     const result = await scrapeGuapProfile({ username, password });
     
     res.json(result);
   } catch (error) {
-    console.error('Ошибка в API парсера профиля:', error);
     res.status(500).json({
       success: false,
       message: `❌ Ошибка парсера профиля: ${error.message}`
@@ -319,12 +299,10 @@ app.post('/api/scrape/marks', async (req, res) => {
       });
     }
 
-    console.log(`Запрос на парсинг оценок для пользователя: ${username}, семестр: ${semester}`);
     const result = await scrapeGuapMarks({ username, password }, semester, contrType, teacher, mark);
     
     res.json(result);
   } catch (error) {
-    console.error('Ошибка в API парсера оценок:', error);
     res.status(500).json({
       success: false,
       message: `❌ Ошибка парсера оценок: ${error.message}`
@@ -337,5 +315,4 @@ app.get('/health', (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Parser service running on port ${PORT}`);
 });

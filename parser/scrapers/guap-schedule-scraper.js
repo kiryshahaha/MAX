@@ -1,4 +1,3 @@
-// parser/scrapers/guap-schedule-scraper.js
 import { BaseScraper } from './base-scraper.js';
 import { GuapAuthStrategy } from '../auth/strategies/guap-auth.js';
 
@@ -15,10 +14,8 @@ export class GuapScheduleScraper extends BaseScraper {
       await this.validateCredentials(credentials);
       page = await this.getAuthenticatedPage(credentials);
 
-      // Переход к расписанию
       await this.navigateToSchedule(page, year, week);
       
-      // Парсинг расписания
       const scheduleData = await this.parseSchedule(page);
       
       return {
@@ -39,7 +36,6 @@ export class GuapScheduleScraper extends BaseScraper {
   }
 
   async navigateToSchedule(page, year, week) {
-    console.log(`Переходим на страницу расписания (год: ${year}, неделя: ${week})...`);
     
     const scheduleUrl = `https://pro.guap.ru/inside/students/classes/schedule/week/${year}/${week}`;
     
@@ -57,7 +53,6 @@ export class GuapScheduleScraper extends BaseScraper {
   async parseSchedule(page) {
     return await page.evaluate(() => {
       
-      // Функция для парсинга местоположения
       const parseBuildingAndRoom = (locationText) => {
         if (!locationText) return { building: '', location: '' };
         
@@ -74,47 +69,37 @@ export class GuapScheduleScraper extends BaseScraper {
         };
       };
 
-      // Функция для парсинга ячейки с информацией о занятии
       const parseClassCell = (cell) => {
       try {
-        // Извлекаем тип занятия (бейдж)
         const badge = cell.querySelector('.badge.bg-primary');
         const type = badge ? badge.textContent.trim() : '';
 
-        // Извлекаем название предмета
         const subjectElement = cell.querySelector('.fw-bolder');
         const subject = subjectElement ? subjectElement.textContent.trim() : '';
 
-        // Извлекаем информацию о преподавателе
         const teacherElement = cell.querySelector('[class*="teacher"], .short-teacher');
         let teacher = '';
         let teacherInfo = '';
         
         if (teacherElement) {
-          // Берем текст до span (имя преподавателя)
           const teacherText = teacherElement.childNodes[0]?.textContent?.trim() || '';
-          teacher = teacherText.replace('Жучкова М.Г.', 'Жучкова М.Г.').trim(); // Пример корректного имени
+          teacher = teacherText.replace('Жучкова М.Г.', 'Жучкова М.Г.').trim(); 
           
-          // Извлекаем информацию о должности из span
           const teacherSpan = teacherElement.querySelector('span');
           if (teacherSpan) {
             teacherInfo = teacherSpan.textContent.trim();
-            // Убираем скобки если есть
             teacherInfo = teacherInfo.replace(/[()]/g, '').trim();
           }
         }
 
-        // Извлекаем информацию о группе
         const groupBadge = cell.querySelector('.badge.bg-dark');
         const group = groupBadge ? groupBadge.textContent.trim() : '';
 
-        // Извлекаем информацию о местоположении - ИСПРАВЛЕННЫЙ КОД
         const locationElement = cell.querySelector('.bi-geo-alt');
         let building = '';
         let location = '';
         
         if (locationElement && locationElement.parentElement) {
-          // Берем только текст после иконки локации
           const locationText = locationElement.nextSibling?.textContent?.trim() || '';
           
           if (locationText) {
@@ -123,11 +108,9 @@ export class GuapScheduleScraper extends BaseScraper {
               building = parts[0].trim();
               location = parts[1].trim();
             } else {
-              // Если нет запятой, пробуем разделить по последнему пробелу
               const words = locationText.split(' ');
               if (words.length > 1) {
                 const lastWord = words[words.length - 1];
-                // Проверяем, похоже ли на номер аудитории
                 if (lastWord.match(/[\d-]/)) {
                   building = words.slice(0, -1).join(' ').trim();
                   location = lastWord;
@@ -151,12 +134,10 @@ export class GuapScheduleScraper extends BaseScraper {
           location: location
         };
       } catch (error) {
-        console.error('Ошибка парсинга ячейки:', error);
         return null;
       }
     };
 
-      // Порядок дней недели для сортировки
       const dayOrder = {
         'Пн': 1, 'Вт': 2, 'Ср': 3, 'Чт': 4, 'Пт': 5, 'Сб': 6, 'Вс': 7
       };
@@ -166,12 +147,10 @@ export class GuapScheduleScraper extends BaseScraper {
         extraClasses: []
       };
 
-      // Парсинг основного расписания (первая таблица)
       const mainTable = document.querySelector('table.table-bordered');
       if (mainTable) {
         const rows = mainTable.querySelectorAll('tbody tr');
         
-        // Получаем дни недели из заголовков
         const dayHeaders = Array.from(mainTable.querySelectorAll('thead th')).slice(2);
         const daysData = dayHeaders.map(header => {
           const link = header.querySelector('a');
@@ -184,8 +163,8 @@ export class GuapScheduleScraper extends BaseScraper {
           if (linkText) {
             const parts = linkText.split('-').map(part => part.trim());
             if (parts.length >= 2) {
-              dayName = parts[0]; // "Пн"
-              date = parts[1];    // "03.11"
+              dayName = parts[0]; 
+              date = parts[1];    
             }
           }
           
@@ -205,7 +184,6 @@ export class GuapScheduleScraper extends BaseScraper {
           };
         });
 
-        // Сортируем дни по порядку
         daysData.sort((a, b) => a.order - b.order);
 
         rows.forEach(row => {
@@ -215,7 +193,6 @@ export class GuapScheduleScraper extends BaseScraper {
             const pairNumber = cells[0].textContent.trim();
             const timeRange = cells[1].textContent.trim();
             
-            // Парсим занятия по дням недели
             for (let dayIndex = 0; dayIndex < daysData.length; dayIndex++) {
               const dayCell = cells[dayIndex + 2];
               
@@ -233,11 +210,9 @@ export class GuapScheduleScraper extends BaseScraper {
           }
         });
 
-        // Добавляем только дни с занятиями
         schedule.days = daysData.filter(day => day.classes.length > 0);
       }
 
-      // Парсинг вне сетки расписания (вторая таблица)
       const extraTables = document.querySelectorAll('table.table-bordered');
       if (extraTables.length > 1) {
         const extraTable = extraTables[1];

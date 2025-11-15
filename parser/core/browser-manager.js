@@ -1,4 +1,3 @@
-//MAX/parser/core/browser-manager.js
 
 import puppeteer from 'puppeteer';
 

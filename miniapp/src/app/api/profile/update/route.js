@@ -1,4 +1,3 @@
-// app/api/profile/update/route.js
 import { userService } from "@/services/user-service";
 import { RetryHandler } from "../../utils/retry-handler";
 
@@ -11,13 +10,7 @@ export async function POST(request) {
         const { username: reqUsername, password, uid } = await request.json();
         username = reqUsername;
 
-        console.log('🔍 ДИАГНОСТИКА - Начало обновления профиля:', {
-            username,
-            uid,
-            passwordExists: !!password
-        });
 
-        // Запрашиваем обновление профиля через парсер с retry
         const parserResponse = await RetryHandler.withRetry(async () => {
             const response = await fetch(`${PARSER_SERVICE_URL}/api/scrape/profile`, {
                 method: 'POST',
@@ -37,31 +30,17 @@ export async function POST(request) {
 
         const result = await parserResponse.json();
         
-        console.log('🔍 ДИАГНОСТИКА - Ответ от парсера (профиль):', {
-            success: result.success,
-            profile: result.profile ? 'получен' : 'отсутствует',
-            message: result.message
-        });
 
         if (result.success && result.profile) {
-            console.log('✅ Профиль получен от парсера, сохраняем в БД');
 
-            // Создаем или обновляем пользователя
             const userResult = await userService.createOrUpdateUser(username, password);
-            console.log('👤 Пользователь создан/обновлен:', {
-                userId: userResult.userId
-            });
 
-            // Сохраняем профиль
             const { profileService } = await import('@/services/profile-service');
             const saveResult = await profileService.saveUserProfile(
                 userResult.userId,
                 result.profile
             );
             
-            console.log('💾 Результат сохранения профиля:', {
-                success: !!saveResult
-            });
 
             return Response.json({
                 success: true,
@@ -70,7 +49,6 @@ export async function POST(request) {
             });
 
         } else {
-            console.error('❌ Парсер вернул ошибку:', result);
             return Response.json({
                 success: false,
                 message: result.message || 'Ошибка получения профиля от парсера',
@@ -79,7 +57,6 @@ export async function POST(request) {
         }
 
     } catch (error) {
-        console.error('❌ Ошибка в profile/update:', error);
         return Response.json(
             {
                 message: `❌ Ошибка обновления профиля: ${error.message}`,

@@ -24,16 +24,13 @@ export default function Auth() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session) {
-        console.log('✅ Пользователь уже авторизован, перенаправляем на главную');
         router.replace('/main');
         return;
       }
       
-      // Если сессии нет, остаемся на странице авторизации
       setAuthChecked(true);
       
     } catch (error) {
-      console.error('Auth check error:', error);
       setAuthChecked(true);
     }
   };
@@ -52,7 +49,6 @@ export default function Auth() {
     }
 
     try {
-      // 1. Проверяем креды через парсер
       const parserSuccess = await initializeParserSession(login, password);
       
       if (!parserSuccess) {
@@ -61,19 +57,16 @@ export default function Auth() {
         return;
       }
 
-      // 2. Сохраняем пароль в localStorage
       localStorage.setItem('guap_password', password);
 
       const email = isValidEmail(login) ? login : `${login}@guap-temp.com`;
 
-      // 3. Создаем/входим в Supabase
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password: password
       });
 
       if (signInError) {
-        // Если пользователя нет - регистрируем
         if (signInError.message?.includes('Invalid login credentials')) {
           const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
             email,
@@ -93,13 +86,10 @@ export default function Auth() {
         }
       }
 
-      // 4. Успешная авторизация
       msg.success("Успешный вход!");
       router.replace('/main');
 
     } catch (error) {
-      console.error('Login error:', error);
-      // При ошибке очищаем пароль из localStorage
       localStorage.removeItem('guap_password');
       msg.error(error.message || "Ошибка авторизации");
     } finally {
@@ -118,22 +108,18 @@ export default function Auth() {
     });
 
     if (!response.ok) {
-      console.warn('Парсер-сервис недоступен');
       return false;
     }
 
     const result = await response.json();
     
     if (result.success && result.sessionActive) {
-      console.log('✅ Сессия парсера инициализирована');
       return true;
     } else {
-      console.warn('❌ Ошибка инициализации сессии парсера:', result.message);
       return false;
     }
 
   } catch (error) {
-    console.warn('Ошибка инициализации сессии парсера:', error.message);
     return false;
   }
 };
@@ -143,7 +129,6 @@ export default function Auth() {
     return emailRegex.test(email);
   };
 
-  // Если проверка авторизации еще не завершена, показываем загрузку
   if (!authChecked) {
     return (
       <div style={{ 
@@ -157,7 +142,6 @@ export default function Auth() {
     );
   }
 
-  // Если проверка завершена и пользователь не авторизован, показываем форму входа
   return (
     <Panel mode="secondary">
       {contextHolder}

@@ -1,4 +1,3 @@
-// app/api/psychologists/schedule/route.js
 const PSYCHOLOGIST_API_URL = process.env.PSYCHOLOGIST_API_URL
 
 export async function GET(request) {
@@ -14,7 +13,6 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    console.log('📅 Запрашиваем расписание для:', { psychologistName, date });
 
     const backendResponse = await fetch(
       `${PSYCHOLOGIST_API_URL}/schedule/${encodeURIComponent(psychologistName)}?date=${date}`
@@ -25,7 +23,6 @@ export async function GET(request) {
     }
 
     const backendData = await backendResponse.json();
-    console.log('📊 Ответ от бэкенда (расписание):', backendData);
 
     return Response.json({
       success: true,
@@ -34,7 +31,6 @@ export async function GET(request) {
     });
 
   } catch (error) {
-    console.error('❌ Schedule API Error:', error);
     return Response.json(
       { 
         message: `❌ Ошибка получения расписания: ${error.message}`,

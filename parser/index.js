@@ -1,4 +1,3 @@
-// index.js
 import { GuapTasksScraper } from './scrapers/guap-tasks-scraper.js';
 import { GuapReportsScraper } from './scrapers/guap-reports-scraper.js';
 import { GuapProfileScraper } from './scrapers/guap-profile-scraper.js';

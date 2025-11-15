@@ -11,7 +11,6 @@ import {
 import { Divider, message } from "antd";
 import { clientSupabase as supabase } from "../../../lib/supabase-client";
 
-// Импортируем компоненты
 import ScheduleSection from "@/components/ScheduleSection";
 import DeadlinesSection from "@/components/DeadlinesSection";
 import ReportsSection from "@/components/ReportsSection";
@@ -34,7 +33,6 @@ export default function MainPage() {
   const [reportsFetchLock, setReportsFetchLock] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
 
-  // Состояния для отслеживания прогресса первоначальной загрузки
   const [initialLoadProgress, setInitialLoadProgress] = useState({
     schedule: false,
     tasks: false,
@@ -55,7 +53,6 @@ export default function MainPage() {
       const { data: { session }, error } = await supabase.auth.getSession();
 
       if (error || !session) {
-        console.log('❌ Нет активной сессии, перенаправляем на авторизацию');
         router.replace('/auth');
         return;
       }
@@ -69,23 +66,16 @@ export default function MainPage() {
         reports: false
       });
 
-      console.log('🔄 Последовательная загрузка данных...');
 
-      // 1. Расписание
       await fetchTodaySchedule(session.user.id, true);
-      await new Promise(resolve => setTimeout(resolve, 500)); // небольшая пауза
+      await new Promise(resolve => setTimeout(resolve, 500)); 
 
-      // 2. Задачи
       await fetchTasks(session.user.id, false, true);
-      await new Promise(resolve => setTimeout(resolve, 500)); // небольшая пауза
-
-      // 3. Отчеты
+      await new Promise(resolve => setTimeout(resolve, 500));
       await fetchReports(session.user.id, false, true);
 
-      console.log('✅ Все данные загружены последовательно');
 
     } catch (error) {
-      console.error('Auth check error:', error);
       router.replace('/auth');
     } finally {
       setLoading(false);
@@ -94,7 +84,6 @@ export default function MainPage() {
 
   const fetchReports = async (userId, forceUpdate = false, isInitialLoad = false) => {
     if (reportsLoading && !isInitialLoad) {
-      console.log('⏳ Запрос отчетов уже выполняется...');
       return;
     }
 
@@ -103,10 +92,8 @@ export default function MainPage() {
         setReportsLoading(true);
       }
 
-      console.log('📋 Запрашиваем отчеты для пользователя:', userId, { forceUpdate });
 
       if (forceUpdate) {
-        console.log('🔄 Принудительное обновление через парсер');
         await updateReportsFromParser(userId, isInitialLoad);
         return;
       }
@@ -118,16 +105,11 @@ export default function MainPage() {
       }
 
       const reportsData = await reportsResponse.json();
-      console.log('📊 Ответ от reports API:', reportsData);
 
-      // Исправленная логика проверки источника данных
       if (reportsData.success && reportsData.reports && reportsData.reports_count > 0) {
         if (reportsData.source === 'supabase') {
-          console.log('✅ Используем актуальные отчеты из Supabase');
         } else if (reportsData.source === 'parser') {
-          console.log('🔄 Используем обновленные отчеты из парсера');
         } else {
-          console.log('✅ Используем отчеты из API');
         }
 
         setReports(reportsData.reports);
@@ -135,12 +117,10 @@ export default function MainPage() {
           setInitialLoadProgress(prev => ({ ...prev, reports: true }));
         }
       } else {
-        console.log('🔄 Отчеты не найдены в БД, обновляем через парсер');
         await updateReportsFromParser(userId, isInitialLoad);
       }
 
     } catch (error) {
-      console.error('❌ Ошибка получения отчетов:', error);
       if (!isInitialLoad) {
         messageApi.error('Ошибка загрузки отчетов');
       }
@@ -153,7 +133,6 @@ export default function MainPage() {
 
   const updateReportsFromParser = async (userId, isInitialLoad = false) => {
     if (reportsFetchLock && !isInitialLoad) {
-      console.log('⏳ Запрос отчетов уже выполняется, ждем...');
       return;
     }
 
@@ -174,12 +153,10 @@ export default function MainPage() {
       const password = localStorage.getItem('guap_password');
 
       if (!guapUsername || !password) {
-        console.error('❌ Отсутствуют данные для авторизации');
         if (!isInitialLoad) messageApi.error('Данные для авторизации не найдены');
         return;
       }
 
-      console.log('🚀 Отправляем запрос на обновление отчетов');
       const updateResponse = await fetch('/api/reports/update', {
         method: 'POST',
         headers: {
@@ -198,7 +175,6 @@ export default function MainPage() {
       }
 
       const updateData = await updateResponse.json();
-      console.log('📊 Ответ от update reports API:', updateData);
 
       if (updateData.success) {
         setReports(updateData.reports || []);
@@ -215,7 +191,6 @@ export default function MainPage() {
       }
 
     } catch (error) {
-      console.error('❌ Ошибка обновления отчетов:', error);
       if (!isInitialLoad) {
         messageApi.error('Ошибка обновления отчетов');
       }
@@ -228,7 +203,6 @@ export default function MainPage() {
 
   const fetchTodaySchedule = async (userId, isInitialLoad = false) => {
     if (scheduleLoading && !isInitialLoad) {
-      console.log('⏳ Запрос расписания уже выполняется...');
       return;
     }
 
@@ -237,7 +211,6 @@ export default function MainPage() {
         setScheduleLoading(true);
       }
 
-      console.log('📅 Запрашиваем расписание для пользователя:', userId);
 
       const scheduleResponse = await fetch(`/api/schedule/today?uid=${userId}`);
 
@@ -246,25 +219,21 @@ export default function MainPage() {
       }
 
       const scheduleData = await scheduleResponse.json();
-      console.log('📊 Ответ от schedule API:', scheduleData);
 
       const shouldUpdateFromParser = !scheduleData.success ||
         scheduleData.needsUpdate ||
         (scheduleData.schedule && scheduleData.schedule.has_schedule === false);
 
       if (scheduleData.success && scheduleData.schedule && !shouldUpdateFromParser) {
-        console.log('✅ Используем актуальное расписание из бэкенда');
         setTodaySchedule(scheduleData.schedule);
         if (isInitialLoad) {
           setInitialLoadProgress(prev => ({ ...prev, schedule: true }));
         }
       } else {
-        console.log('🔄 Расписание не найдено, устарело или дата не совпадает, обновляем через парсер');
         await updateScheduleFromParser(userId, isInitialLoad);
       }
 
     } catch (error) {
-      console.error('❌ Ошибка получения расписания:', error);
       if (!isInitialLoad) {
         messageApi.error('Ошибка загрузки расписания');
       }
@@ -277,7 +246,6 @@ export default function MainPage() {
 
   const updateScheduleFromParser = async (userId, isInitialLoad = false) => {
     if (fetchLock && !isInitialLoad) {
-      console.log('⏳ Запрос уже выполняется, ждем...');
       return;
     }
 
@@ -300,12 +268,10 @@ export default function MainPage() {
       const currentDateString = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
 
       if (!guapUsername || !password) {
-        console.error('❌ Отсутствуют данные для авторизации');
         if (!isInitialLoad) messageApi.error('Данные для авторизации не найдены');
         return;
       }
 
-      console.log('🚀 Отправляем запрос на обновление расписания');
       const updateResponse = await fetch('/api/schedule/update', {
         method: 'POST',
         headers: {
@@ -324,7 +290,6 @@ export default function MainPage() {
       }
 
       const updateData = await updateResponse.json();
-      console.log('📊 Ответ от update API:', updateData);
 
       if (updateData.success) {
         setTodaySchedule(updateData.schedule);
@@ -341,7 +306,6 @@ export default function MainPage() {
       }
 
     } catch (error) {
-      console.error('❌ Ошибка обновления расписания:', error);
       if (!isInitialLoad) {
         messageApi.error('Ошибка обновления расписания');
       }
@@ -354,7 +318,6 @@ export default function MainPage() {
 
   const fetchTasks = async (userId, forceUpdate = false, isInitialLoad = false) => {
     if (tasksLoading && !isInitialLoad) {
-      console.log('⏳ Запрос задач уже выполняется...');
       return;
     }
 
@@ -363,10 +326,8 @@ export default function MainPage() {
         setTasksLoading(true);
       }
 
-      console.log('📝 Запрашиваем задачи для пользователя:', userId, { forceUpdate });
 
       if (forceUpdate) {
-        console.log('🔄 Принудительное обновление через парсер');
         await updateTasksFromParser(userId, isInitialLoad);
         return;
       }
@@ -378,16 +339,11 @@ export default function MainPage() {
       }
 
       const tasksData = await tasksResponse.json();
-      console.log('📊 Ответ от tasks API:', tasksData);
 
-      // Исправленная логика проверки источника данных
       if (tasksData.success && tasksData.tasks && tasksData.tasks_count > 0) {
         if (tasksData.source === 'supabase') {
-          console.log('✅ Используем актуальные задачи из Supabase');
         } else if (tasksData.source === 'parser') {
-          console.log('🔄 Используем обновленные задачи из парсера');
         } else {
-          console.log('✅ Используем задачи из API');
         }
 
         setTasks(tasksData.tasks);
@@ -395,12 +351,10 @@ export default function MainPage() {
           setInitialLoadProgress(prev => ({ ...prev, tasks: true }));
         }
       } else {
-        console.log('🔄 Задачи не найдены в БД, обновляем через парсер');
         await updateTasksFromParser(userId, isInitialLoad);
       }
 
     } catch (error) {
-      console.error('❌ Ошибка получения задач:', error);
       if (!isInitialLoad) {
         messageApi.error('Ошибка загрузки задач');
       }
@@ -413,7 +367,6 @@ export default function MainPage() {
 
   const updateTasksFromParser = async (userId, isInitialLoad = false) => {
     if (tasksFetchLock && !isInitialLoad) {
-      console.log('⏳ Запрос задач уже выполняется, ждем...');
       return;
     }
 
@@ -434,12 +387,10 @@ export default function MainPage() {
       const password = localStorage.getItem('guap_password');
 
       if (!guapUsername || !password) {
-        console.error('❌ Отсутствуют данные для авторизации');
         if (!isInitialLoad) messageApi.error('Данные для авторизации не найдены');
         return;
       }
 
-      console.log('🚀 Отправляем запрос на обновление задач');
       const updateResponse = await fetch('/api/tasks/update', {
         method: 'POST',
         headers: {
@@ -458,7 +409,6 @@ export default function MainPage() {
       }
 
       const updateData = await updateResponse.json();
-      console.log('📊 Ответ от update tasks API:', updateData);
 
       if (updateData.success) {
         setTasks(updateData.tasks || []);
@@ -475,7 +425,6 @@ export default function MainPage() {
       }
 
     } catch (error) {
-      console.error('❌ Ошибка обновления задач:', error);
       if (!isInitialLoad) {
         messageApi.error('Ошибка обновления задач');
       }
@@ -502,7 +451,6 @@ export default function MainPage() {
     return initialLoadProgress.schedule && initialLoadProgress.tasks && initialLoadProgress.reports;
   };
 
-  // Показываем загрузку пока проверяем авторизацию
   if (loading || (authChecked && !isInitialLoadComplete())) {
     return (
       <Flex className="wrap" align="center"

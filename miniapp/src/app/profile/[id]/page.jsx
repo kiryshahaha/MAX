@@ -24,13 +24,6 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { clientSupabase as supabase } from "../../../../lib/supabase-client.js";
 
-// Замените на реальные иконки из вашей библиотеки
-const Icon24Placeholder = () => <div></div>;
-const Icon24Notifications = () => <div></div>;
-const Icon24Search = () => <div></div>;
-const Icon24Music = () => <div></div>;
-const Icon24More = () => <div></div>;
-
 export default function ProfilePage() {
   const { id } = useParams();
   const [profile, setProfile] = useState(null);
@@ -56,7 +49,6 @@ export default function ProfilePage() {
       }
 
       const userId = session.user.id;
-      console.log('Запрашиваем профиль для пользователя:', userId);
 
       const response = await fetch(`/api/profile?uid=${userId}`);
 
@@ -65,36 +57,25 @@ export default function ProfilePage() {
       }
 
       const data = await response.json();
-      console.log('Получены данные профиля:', data);
 
       if (data.success) {
-        console.log('Профиль успешно загружен, структура:', data.profile);
         setProfile(data.profile);
 
-        // Автоматически запускаем парсер если профиль пустой И мы еще не пытались
         if (isEmptyProfile(data.profile) && !autoUpdateAttempted) {
-          console.log('Профиль пустой, запускаем автоматическое обновление...');
           await handleAutoUpdateProfile();
         }
       } else {
-        console.log('Профиль не найден в ответе');
         setProfile(null);
-        // Если профиль не найден, пробуем автоматическое обновление
         if (!autoUpdateAttempted) {
-          console.log('Профиль не найден, запускаем автоматическое обновление...');
           await handleAutoUpdateProfile();
         }
       }
 
     } catch (err) {
-      console.error('Ошибка загрузки профиля:', err);
 
-      // При ошибке тоже пробуем автоматическое обновление (только один раз)
       if (!autoUpdateAttempted) {
-        console.log('Ошибка загрузки, пробуем автоматическое обновление...');
         await handleAutoUpdateProfile();
       } else {
-        // Если уже пробовали автообновление и все равно ошибка - показываем её
         setError(err.message);
       }
     } finally {
@@ -143,45 +124,28 @@ export default function ProfilePage() {
       }
 
     } catch (error) {
-      console.error('Logout error:', error);
       localStorage.removeItem('guap_password');
       localStorage.clear();
       sessionStorage.clear();
       window.location.href = '/auth';
     }
   };
-  // Проверяем, пустой ли профиль
   const isEmptyProfile = (profileData) => {
     if (!profileData) {
-      console.log('Профиль пустой: profileData is null');
       return true;
     }
 
-    console.log('Проверяем структуру профиля:', profileData);
 
-    // Если профиль в новой структуре (из парсера)
     if (profileData.personal_info) {
       const isEmpty = !profileData.personal_info.full_name &&
         !profileData.academic_info?.group;
-      console.log('Проверка новой структуры:', {
-        full_name: profileData.personal_info.full_name,
-        group: profileData.academic_info?.group,
-        isEmpty
-      });
       return isEmpty;
     }
 
-    // Если профиль в старой структуре
     const isEmpty = !profileData.fullName && !profileData.group;
-    console.log('Проверка старой структуры:', {
-      fullName: profileData.fullName,
-      group: profileData.group,
-      isEmpty
-    });
     return isEmpty;
   };
 
-  // Автоматическое обновление профиля (без показа ошибок пользователю)
   const handleAutoUpdateProfile = async () => {
     try {
       setAutoUpdating(true);
@@ -189,7 +153,6 @@ export default function ProfilePage() {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        console.log('Нет сессии для автоматического обновления');
         return;
       }
 
@@ -200,11 +163,9 @@ export default function ProfilePage() {
       const password = localStorage.getItem('guap_password');
 
       if (!username || !password) {
-        console.log('Нет данных для автоматического обновления');
         return;
       }
 
-      console.log('Автоматическое обновление профиля через парсер...');
 
       const response = await fetch('/api/profile/update', {
         method: 'POST',
@@ -219,28 +180,20 @@ export default function ProfilePage() {
       });
 
       if (!response.ok) {
-        console.error('Ошибка автоматического обновления профиля:', response.status);
-        // НЕ устанавливаем ошибку - пробуем загрузить существующий профиль
         await loadExistingProfile();
         return;
       }
 
       const data = await response.json();
-      console.log('Данные после автоматического обновления:', data);
 
       if (data.success) {
         setProfile(data.profile);
-        console.log('Профиль автоматически обновлен');
         setError(null);
       } else {
-        console.error('Ошибка автоматического обновления:', data.message);
-        // Пробуем загрузить существующий профиль
         await loadExistingProfile();
       }
 
     } catch (err) {
-      console.error('Ошибка автоматического обновления профиля:', err);
-      // Пробуем загрузить существующий профиль
       await loadExistingProfile();
     } finally {
       setAutoUpdating(false);
@@ -259,15 +212,12 @@ export default function ProfilePage() {
         const data = await response.json();
         if (data.success && data.profile) {
           setProfile(data.profile);
-          console.log('Загружен существующий профиль из БД');
         }
       }
     } catch (err) {
-      console.error('Ошибка загрузки существующего профиля:', err);
     }
   };
 
-  // Ручное обновление профиля (с показом ошибок пользователю)
   const handleUpdateProfile = async () => {
     try {
       setUpdating(true);
@@ -288,7 +238,6 @@ export default function ProfilePage() {
         throw new Error('Отсутствуют данные для авторизации');
       }
 
-      console.log('Ручное обновление профиля...');
       const response = await fetch('/api/profile/update', {
         method: 'POST',
         headers: {
@@ -306,35 +255,26 @@ export default function ProfilePage() {
       }
 
       const data = await response.json();
-      console.log('Данные после ручного обновления:', data);
 
       if (data.success) {
         setProfile(data.profile);
-        console.log('Профиль успешно обновлен');
       } else {
         throw new Error(data.message || 'Ошибка обновления профиля');
       }
 
     } catch (err) {
-      console.error('Ошибка обновления профиля:', err);
       setError(err.message);
     } finally {
       setUpdating(false);
     }
   };
 
-  // Улучшенная функция для получения данных профиля с защитой от ошибок
   const getProfileData = () => {
     if (!profile) {
-      console.log('getProfileData: profile is null');
       return null;
     }
 
-    console.log('getProfileData - исходный профиль:', profile);
-
-    // Если профиль уже в плоской структуре (старый формат)
     if (profile.fullName) {
-      console.log('Используем старую структуру профиля');
       return {
         fullName: profile.fullName || 'Не указано',
         group: profile.group || 'Не указано',
@@ -352,8 +292,6 @@ export default function ProfilePage() {
       };
     }
 
-    // Преобразуем новую структуру в плоскую
-    console.log('Преобразуем новую структуру профиля');
     const profileData = {
       fullName: profile.personal_info?.full_name || 'Не указано',
       group: profile.academic_info?.group || 'Не указано',
@@ -374,17 +312,13 @@ export default function ProfilePage() {
       photoUrl: profile.personal_info?.photo_url || null
     };
 
-    console.log('Преобразованные данные профиля:', profileData);
     return profileData;
   };
 
   const profileData = getProfileData();
-  console.log('Final profileData для отображения:', profileData);
 
-  // Комбинированная загрузка (начальная + автоматическое обновление)
   const isLoading = loading || autoUpdating;
 
-  // Показываем загрузку пока идет начальная загрузка или автоматическое обновление
   if (isLoading) {
     return (
       <Panel mode="secondary">
@@ -400,7 +334,6 @@ export default function ProfilePage() {
     );
   }
 
-  // Показываем ошибку ТОЛЬКО если это ручное обновление и есть ошибка
   if (error && !autoUpdating) {
     return (
       <Panel mode="secondary">
@@ -421,7 +354,6 @@ export default function ProfilePage() {
     );
   }
 
-  // Если профиль пустой после всех попыток
   if (!profileData || isEmptyProfile(profile)) {
     console.log('Профиль пустой после всех попыток загрузки');
     return (
@@ -443,7 +375,6 @@ export default function ProfilePage() {
     );
   }
 
-  console.log('Рендерим профиль с данными:', profileData);
 
   return (
     <Panel mode="secondary" className="wrap" >

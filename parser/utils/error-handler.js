@@ -1,8 +1,5 @@
-//MAX/parser/utils/error-handler.js
-
 export class ErrorHandler {
   static handleScrapingError(error) {
-    console.error('Ошибка скрапинга:', error);
     
     if (error.message.includes('Неверный логин или пароль')) {
       return {
@@ -18,7 +15,6 @@ export class ErrorHandler {
       };
     }
     
-    // Обработка сетевых ошибок
     if (error.message.includes('ERR_ABORTED') || error.message.includes('detached')) {
       return {
         message: '⚠️ Проблема с подключением к серверу ГУАП. Попробуйте позже.',
@@ -27,7 +23,6 @@ export class ErrorHandler {
       };
     }
     
-    // Обработка таймаутов
     if (error.message.includes('timeout') || error.message.includes('Timeout')) {
       return {
         message: '⚠️ Превышено время ожидания ответа от сервера ГУАП.',
@@ -37,7 +32,7 @@ export class ErrorHandler {
     }
     
     return {
-      message: '⚠️ Ошибка при выполнении скрипта: ' + error.message,
+      message: '⚠️ Ошибка при выполнении скрипта.',
       status: 500
     };
   }

@@ -14,7 +14,6 @@ export const logsService = {
         created_at: new Date().toISOString()
       };
 
-      // Пробуем добавить items_count, но если будет ошибка - уберем его
       const logDataWithCount = {
         ...logData,
         items_count: count
@@ -25,22 +24,16 @@ export const logsService = {
         .insert(logDataWithCount);
 
       if (error) {
-        console.log('Пробуем записать лог без items_count:', error.message);
-        // Пробуем без items_count
         const { error: retryError } = await adminSupabase
           .from('login_logs')
           .insert(logData);
         
         if (retryError) {
-          console.error('Ошибка записи лога:', retryError);
         } else {
-          console.log(`📝 Логин записан (без items_count): ${username}, успех: ${success}, тип: ${type}`);
         }
       } else {
-        console.log(`📝 Логин записан: ${username}, успех: ${success}, тип: ${type}, кол-во: ${count}`);
       }
     } catch (error) {
-      console.error('Log service error:', error);
     }
   }
 };

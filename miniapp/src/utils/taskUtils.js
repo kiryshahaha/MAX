@@ -1,5 +1,3 @@
-// utils/taskUtils.js
-
 /**
  * Извлекает ID задачи из ссылки GUAP
  */
@@ -14,7 +12,6 @@ export const extractTaskIdFromLink = (link) => {
       return pathParts[taskIndex + 1];
     }
     
-    // Если не нашли через 'tasks', берем последнюю часть
     return pathParts[pathParts.length - 1] || null;
   } catch (error) {
     console.error('Error extracting task ID from link:', error);
@@ -56,12 +53,10 @@ export const areTaskNamesSimilar = (name1, name2) => {
   
   if (normalized1 === normalized2) return true;
   
-  // Проверяем частичное вхождение
   if (normalized1.includes(normalized2) || normalized2.includes(normalized1)) {
     return true;
   }
   
-  // Сравниваем первые несколько слов
   const words1 = normalized1.split(' ').slice(0, 3);
   const words2 = normalized2.split(' ').slice(0, 3);
   

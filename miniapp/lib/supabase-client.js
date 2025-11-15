@@ -1,12 +1,9 @@
-// lib/supabase-client.js
 import { createClient } from '@supabase/supabase-js';
 
-// Проверяем наличие обязательных переменных окружения
 if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
   throw new Error('Missing env.NEXT_PUBLIC_SUPABASE_URL');
 }
 
-// Создаем клиент для клиентских операций (с RLS)
 export const clientSupabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -17,7 +14,6 @@ export const clientSupabase = createClient(
   }
 );
 
-// Функция для создания админ-клиента (только на сервере)
 export const getAdminSupabase = () => {
   if (typeof window !== 'undefined') {
     throw new Error('Admin Supabase client is only available on the server');

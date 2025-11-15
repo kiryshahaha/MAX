@@ -39,7 +39,6 @@ export default function SchedulePage() {
       const { data: { session }, error } = await supabase.auth.getSession();
 
       if (error || !session) {
-        console.log('❌ Нет активной сессии');
         router.push('/auth');
         return;
       }
@@ -47,7 +46,6 @@ export default function SchedulePage() {
       setUser(session.user);
 
     } catch (error) {
-      console.error('Auth check error:', error);
       messageApi.error('Ошибка авторизации');
       router.push('/auth');
     } finally {
@@ -57,13 +55,11 @@ export default function SchedulePage() {
 
   const fetchSchedule = async (type) => {
     if (scheduleLoading) {
-      console.log('⏳ Запрос расписания уже выполняется...');
       return;
     }
 
     try {
       setScheduleLoading(true);
-      console.log(`📅 Запрашиваем расписание: ${type} для пользователя:`, user.id);
 
       let apiUrl = '';
       switch (type) {
@@ -90,18 +86,15 @@ export default function SchedulePage() {
       }
 
       const responseData = await scheduleResponse.json();
-      console.log(`📊 Ответ от ${type} schedule API:`, responseData);
 
       if (responseData.success) {
         setScheduleData(responseData);
       } else {
-        console.log(`🔄 Расписание на ${type} не найдено`);
         setScheduleData(null);
         messageApi.warning(responseData.message || `Расписание на ${getTabTitle(type)} не найдено`);
       }
 
     } catch (error) {
-      console.error(`❌ Ошибка получения расписания (${activeTab}):`, error);
       messageApi.error(`Ошибка загрузки расписания на ${getTabTitle(activeTab)}`);
       setScheduleData(null);
     } finally {
@@ -123,12 +116,10 @@ export default function SchedulePage() {
       const password = localStorage.getItem('guap_password');
 
       if (!guapUsername || !password) {
-        console.error('❌ Отсутствуют данные для авторизации');
         messageApi.error('Данные для авторизации не найдены');
         return;
       }
 
-      console.log('🚀 Отправляем запрос на обновление недельного расписания');
       const updateResponse = await fetch('/api/schedule/week/update', {
         method: 'POST',
         headers: {
@@ -147,25 +138,21 @@ export default function SchedulePage() {
       }
 
       const updateData = await updateResponse.json();
-      console.log('📊 Ответ от update schedule API:', updateData);
 
       if (updateData.success) {
         messageApi.success('Расписание обновлено');
-        // После обновления перезагружаем текущее расписание
         fetchSchedule(activeTab);
       } else {
         messageApi.error(updateData.message || 'Ошибка обновления расписания');
       }
 
     } catch (error) {
-      console.error('❌ Ошибка обновления расписания:', error);
       messageApi.error('Ошибка обновления расписания');
     }
   };
 
   const formatDaySchedule = (classes) => {
     if (!classes || !Array.isArray(classes)) {
-      console.log('❌ formatDaySchedule: classes не является массивом:', classes);
       return [];
     }
 
@@ -193,7 +180,6 @@ export default function SchedulePage() {
       return `${baseTitle} на неделю ${scheduleData?.week ? `(неделя ${scheduleData.week})` : ''}`;
     }
 
-    // Для дней (today/tomorrow/yesterday) используем данные из schedule.schedule
     if (scheduleData?.schedule) {
       const dayInfo = scheduleData.schedule;
       return `${baseTitle} на ${getTabTitle(activeTab)} (${dayInfo.date_dd_mm}, ${dayInfo.day_name})`;
@@ -211,10 +197,8 @@ export default function SchedulePage() {
 
   const getClassesForDay = () => {
     if (activeTab === 'week') {
-      // Для недели берем дни из schedule.days
       return scheduleData?.schedule?.days || [];
     } else {
-      // Для дней (today/tomorrow/yesterday) берем занятия из schedule.schedule.schedule
       return scheduleData?.schedule?.schedule || [];
     }
   };
@@ -240,7 +224,6 @@ export default function SchedulePage() {
     }
 
     if (activeTab === 'week') {
-      // Рендерим недельное расписание
       const days = getClassesForDay();
 
       if (days.length === 0) {
@@ -254,7 +237,6 @@ export default function SchedulePage() {
           />
           {day.classes && day.classes.length > 0 ? (
             <CellSimple
-              // title={}
               after={`${day.dayName}, ${day.date}`}
 
             >
@@ -271,7 +253,6 @@ export default function SchedulePage() {
         </div>
       ));
     } else {
-      // Рендерим расписание на день (today/tomorrow/yesterday)
       const classes = getClassesForDay();
 
       if (!Array.isArray(classes)) {

@@ -1,4 +1,3 @@
-// app/api/schedule/update/route.js
 import { userService } from "@/services/user-service";
 import { getAdminSupabase } from "../../../../../lib/supabase-client";
 
@@ -18,7 +17,6 @@ export async function POST(request) {
             }, { status: 400 });
         }
 
-        console.log('🚀 Запрашиваем расписание у парсера:', { username, date });
 
         const parserResponse = await fetch(`${PARSER_SERVICE_URL}/api/scrape/daily-schedule`, {
             method: 'POST',
@@ -34,20 +32,11 @@ export async function POST(request) {
         }
 
         const result = await parserResponse.json();
-        console.log('📊 Результат от парсера:', {
-            success: result.success,
-            scheduleCount: result.schedule?.length
-        });
 
         if (result.success && result.schedule) {
             try {
-                // Создание/обновление пользователя
                 const userResult = await userService.createOrUpdateUser(username, password);
-                console.log('👤 Результат создания пользователя:', {
-                    userId: userResult.userId
-                });
 
-                // Формируем объект расписания (как в оригинальной логике)
                 const scheduleObj = {
                     date: date,
                     date_dd_mm: `${String(new Date(date).getDate()).padStart(2, '0')}.${String(new Date(date).getMonth() + 1).padStart(2, '0')}`,
@@ -57,24 +46,17 @@ export async function POST(request) {
                 };
 
                 try {
-                    // Сохраняем расписание в БД при каждом обращении к парсеру
                     const { scheduleService } = await import('@/services/schedule-service');
                     const saveResult = await scheduleService.saveUserSchedule(
                         userResult.userId,
                         result.schedule || [],
                         'today',
                         { date: date },
-                        true // ВСЕГДА сохраняем в БД при обращении к парсеру
+                        true 
                     );
 
-                    console.log('💾 Результат сохранения в БД:', {
-                        savedToDatabase: saveResult.savedToDatabase,
-                        scheduleCount: result.schedule?.length || 0
-                    });
 
                 } catch (dbError) {
-                    console.error('❌ Ошибка сохранения расписания в БД:', dbError.message);
-                    // НЕ прерываем выполнение - просто логируем ошибку
                 }
 
                 return Response.json({
@@ -84,7 +66,6 @@ export async function POST(request) {
                 });
 
             } catch (dbError) {
-                console.error('❌ Ошибка работы с БД:', dbError.message);
                 return Response.json({
                     success: false,
                     message: `Ошибка работы с пользователем: ${dbError.message}`,
@@ -100,11 +81,10 @@ export async function POST(request) {
         }
 
     } catch (error) {
-        console.error('❌ Schedule Update API Error:', error);
 
         return Response.json(
             {
-                message: `❌ Ошибка обновления расписания: ${error.message}`,
+                message: `❌ Ошибка обновления расписания.`,
                 success: false,
                 schedule: null
             },

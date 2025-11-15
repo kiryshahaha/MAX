@@ -15,7 +15,6 @@ export default function BottomNavBar() {
   useEffect(() => {
     checkAuth();
 
-    // Слушаем изменения авторизации
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
     });
@@ -28,14 +27,12 @@ export default function BottomNavBar() {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user || null);
     } catch (error) {
-      console.error('Auth check error:', error);
       setUser(null);
     } finally {
       setLoading(false);
     }
   };
 
-  // Базовые элементы навигации для авторизованных пользователей
   const authNavItems = [
     { name: "Главная", href: "/main", Icon: ToolCase },
     { name: "Расписание", href: "/schedule/week", Icon: Calendar },
@@ -43,7 +40,6 @@ export default function BottomNavBar() {
     { name: "Профиль", href: user ? `/profile/${user.id}` : "/auth", Icon: CircleUser },
   ];
 
-  // Элементы навигации для неавторизованных пользователей
   const unauthNavItems = [
     { name: "Главная", href: "/", Icon: ToolCase },
     { name: "Вход", href: "/auth", Icon: ScanFace },
@@ -51,7 +47,6 @@ export default function BottomNavBar() {
 
   const navItems = user ? authNavItems : unauthNavItems;
 
-  // Не показываем навбар на странице авторизации
   if (pathname === '/auth' || loading) {
     return null;
   }

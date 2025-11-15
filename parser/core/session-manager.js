@@ -1,16 +1,13 @@
-// session-manager.js
 import puppeteer from 'puppeteer';
 import { GuapAuthStrategy } from '../auth/strategies/guap-auth.js';
 
 export class SessionManager {
   static sessions = new Map();
-  static SESSION_TIMEOUT = 30 * 60 * 1000; // 30 минут
+  static SESSION_TIMEOUT = 30 * 60 * 1000; 
 
-  // Создание новой сессии с авторизацией в ГУАП
   static async createSession(username, password) {
     let browser;
     try {
-      // Закрываем старую сессию если есть
       const existingSession = this.sessions.get(username);
       if (existingSession) {
         await existingSession.page.close();
@@ -23,16 +20,11 @@ export class SessionManager {
       });
 
       const page = await browser.newPage();
-      
-      // Устанавливаем таймауты
       page.setDefaultTimeout(30000);
       page.setDefaultNavigationTimeout(30000);
 
-      // Пытаемся залогиниться в ГУАП
-      console.log(`🔐 Авторизация в ГУАП для пользователя: ${username}`);
       const finalUrl = await GuapAuthStrategy.login(page, { username, password });
       
-      // Проверяем успешность авторизации
       if (!GuapAuthStrategy.isLoginSuccessful(finalUrl)) {
         await browser.close();
         return {
@@ -52,16 +44,13 @@ export class SessionManager {
 
       this.sessions.set(username, session);
       
-      console.log(`✅ Сессия создана для пользователя: ${username}`);
       return {
         success: true,
         sessionId: username
       };
 
     } catch (error) {
-      console.error('Ошибка создания сессии:', error);
       
-      // Закрываем браузер если он открылся
       if (browser) {
         await browser.close();
       }
@@ -80,7 +69,6 @@ export class SessionManager {
     }
   }
 
-  // Получение существующей сессии
 static getSession(username) {
   const session = this.sessions.get(username);
   
@@ -88,9 +76,7 @@ static getSession(username) {
     return null;
   }
   
-  // ПРОВЕРКА ВАЛИДНОСТИ ПЕРЕД ВОЗВРАТОМ
   if (!this.isSessionValid(session) || !this.validateSession(username)) {
-    console.log(`🗑️ Удаление невалидной сессии: ${username}`);
     this.sessions.delete(username);
     return null;
   }
@@ -99,18 +85,15 @@ static getSession(username) {
   return session;
 }
 
-  // Проверка валидности сессии
   static isSessionValid(session) {
     const now = Date.now();
     const isValid = (now - session.lastActivity) < this.SESSION_TIMEOUT;
     
     if (!isValid) {
-      console.log(`⌛ Сессия истекла для пользователя: ${session.username}`);
     }
     return isValid;
   }
 
-  // Проверка активности сессии (проверяет что страница еще жива)
   static async isSessionActive(username) {
     const session = this.sessions.get(username);
     
@@ -119,13 +102,11 @@ static getSession(username) {
     }
 
     try {
-      // Простая проверка - пытаемся перейти на главную страницу ЛК ГУАП
       await session.page.goto('https://pro.guap.ru/', { 
         waitUntil: 'networkidle2', 
         timeout: 10000 
       });
       
-      // Если URL содержит pro.guap.ru - сессия активна
       const isActive = session.page.url().includes('pro.guap.ru');
       
       if (isActive) {
@@ -133,15 +114,12 @@ static getSession(username) {
         return true;
       }
     } catch (e) {
-      console.log(`❌ Сессия неактивна для ${username}:`, e.message);
     }
 
-    // Если проверка не удалась - помечаем сессию как невалидную
     session.isValid = false;
     return false;
   }
 
-  // Обновление времени активности
   static updateActivity(username) {
     const session = this.sessions.get(username);
     if (session) {
@@ -149,19 +127,16 @@ static getSession(username) {
     }
   }
 
-  // Очистка устаревших сессий
   static async cleanupExpiredSessions() {
     const now = Date.now();
     let cleanedCount = 0;
 
     for (const [username, session] of this.sessions.entries()) {
       if (now - session.lastActivity > this.SESSION_TIMEOUT) {
-        console.log(`🧹 Очистка устаревшей сессии: ${username}`);
         try {
           await session.page.close();
           await session.browser.close();
         } catch (e) {
-          console.error(`Ошибка при закрытии сессии ${username}:`, e);
         }
         this.sessions.delete(username);
         cleanedCount++;
@@ -169,28 +144,22 @@ static getSession(username) {
     }
 
     if (cleanedCount > 0) {
-      console.log(`✅ Очищено ${cleanedCount} устаревших сессий`);
     }
   }
 
-  // Принудительное закрытие всех сессий
   static async cleanupAllSessions() {
-    console.log('🛑 Закрытие всех сессий...');
     
     for (const [username, session] of this.sessions.entries()) {
       try {
         await session.page.close();
         await session.browser.close();
       } catch (e) {
-        console.error(`Ошибка при закрытии сессии ${username}:`, e);
       }
     }
     
     this.sessions.clear();
-    console.log('✅ Все сессии закрыты');
   }
 
-  // Получение статистики по сессиям
   static getSessionStats() {
     const activeSessions = Array.from(this.sessions.values()).filter(session => 
       this.isSessionValid(session)
@@ -206,26 +175,13 @@ static getSession(username) {
   static async debugSession(username) {
   const session = this.sessions.get(username);
   if (!session) {
-    console.log('🔍 СЕССИЯ: не найдена');
     return false;
   }
 
-  console.log('🔍 ДЕБАГ СЕССИИ:', {
-    username,
-    createdAt: new Date(session.createdAt).toISOString(),
-    lastActivity: new Date(session.lastActivity).toISOString(),
-    age: Date.now() - session.createdAt,
-    isValid: this.isSessionValid(session),
-    pageUrl: session.page.url(),
-    browserConnected: !session.browser.process()?.killed
-  });
 
   try {
-    // Проверяем что страница жива
     const currentUrl = session.page.url();
-    console.log('   - Текущий URL страницы:', currentUrl);
     
-    // Проверяем наличие элементов ЛК ГУАП
     const hasGuapElements = await session.page.evaluate(() => {
       return {
         hasNavigation: !!document.querySelector('[class*="navigation"]'),
@@ -235,11 +191,9 @@ static getSession(username) {
       };
     });
     
-    console.log('   - Элементы ЛК:', hasGuapElements);
     return true;
     
   } catch (error) {
-    console.log('   - Ошибка проверки сессии:', error.message);
     return false;
   }
 }
@@ -248,13 +202,10 @@ static async validateSession(username) {
   if (!session) return false;
   
   try {
-    // Проверяем, что страница жива и доступна
     if (session.page.isClosed()) {
-      console.log(`❌ Страница закрыта для пользователя: ${username}`);
       return false;
     }
     
-    // Простая проверка доступности DOM
     await session.page.evaluate(() => {
       if (!document || !document.body) {
         throw new Error('DOM not available');
@@ -263,7 +214,6 @@ static async validateSession(username) {
     
     return true;
   } catch (error) {
-    console.log(`❌ Сессия невалидна для ${username}:`, error.message);
     return false;
   }
 }

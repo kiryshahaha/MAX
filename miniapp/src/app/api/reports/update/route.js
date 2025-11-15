@@ -1,8 +1,6 @@
-// app/api/reports/update/route.js
 import { userService } from "@/services/user-service";
 import { getAdminSupabase } from "../../../../../lib/supabase-client";
 
-// ✅ ДОБАВЬТЕ ЭТУ СТРОКУ:
 const PARSER_SERVICE_URL = process.env.PARSER_SERVICE_URL;
 
 export async function POST(request) {
@@ -12,11 +10,6 @@ export async function POST(request) {
         const { username: reqUsername, password, uid } = await request.json();
         username = reqUsername;
 
-        console.log('🔍 ДИАГНОСТИКА - Начало обработки отчетов:', {
-            username,
-            uid,
-            passwordExists: !!password
-        });
 
         const parserResponse = await fetch(`${PARSER_SERVICE_URL}/api/scrape/reports`, {
             method: 'POST',
@@ -28,40 +21,18 @@ export async function POST(request) {
 
         const result = await parserResponse.json();
         
-        // ДЕТАЛЬНОЕ ЛОГИРОВАНИЕ
-        console.log('🔍 ДИАГНОСТИКА - Ответ от парсера:', {
-            success: result.success,
-            reportsCount: result.reports?.length,
-            reports: result.reports, // ВСЕ отчеты
-            message: result.message,
-            status: parserResponse.status
-        });
 
         if (result.success && result.reports) {
-            console.log('🔍 ДИАГНОСТИКА - Сохраняем отчеты в БД:', {
-                reportsCount: result.reports.length,
-                firstReport: result.reports[0] // пример первого отчета
-            });
 
             const userResult = await userService.createOrUpdateUser(username, password);
-            console.log('🔍 ДИАГНОСТИКА - Пользователь создан:', {
-                userId: userResult.userId
-            });
 
-            // Динамический импорт
             const { reportsService } = await import('@/services/reports-service');
             
-            console.log('🔍 ДИАГНОСТИКА - Вызов reportsService.saveUserReports...');
             const saveResult = await reportsService.saveUserReports(
                 userResult.userId,
                 result.reports
             );
             
-            console.log('🔍 ДИАГНОСТИКА - Результат сохранения:', {
-                saveResult,
-                saveResultLength: saveResult?.length,
-                type: typeof saveResult
-            });
 
             return Response.json({
                 success: true,
@@ -71,7 +42,6 @@ export async function POST(request) {
             });
 
         } else {
-            console.error('❌ ДИАГНОСТИКА - Парсер вернул ошибку:', result);
             return Response.json({
                 success: false,
                 message: result.message || 'Ошибка получения отчетов от парсера',
@@ -80,7 +50,6 @@ export async function POST(request) {
         }
 
     } catch (error) {
-        console.error('❌ ДИАГНОСТИКА - Ошибка в reports/update:', error);
         return Response.json(
             {
                 message: `❌ Ошибка обновления отчетов: ${error.message}`,

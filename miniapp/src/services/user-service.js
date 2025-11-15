@@ -48,7 +48,6 @@ export const userService = {
       }
       
     } catch (error) {
-      console.error('Ошибка создания/обновления пользователя:', error);
       throw error;
     }
   },

@@ -10,12 +10,11 @@ export async function POST(request) {
     const { username, password } = await request.json();
 
     if (!username || !password) {
-      return Response.json({ 
-        message: '❌ Укажите логин и пароль' 
+      return Response.json({
+        message: '❌ Укажите логин и пароль'
       }, { status: 400 });
     }
 
-    // Сначала проверяем наличие пользователя и его задач
     try {
       const userTasks = await getStoredUserTasks(username);
       if (userTasks && userTasks.tasks && userTasks.tasks.length > 0) {
@@ -28,10 +27,8 @@ export async function POST(request) {
         });
       }
     } catch (cacheError) {
-      console.log('Не удалось загрузить сохраненные задачи:', cacheError.message);
     }
 
-    // Если сохраненных задач нет, обращаемся к парсеру с retry логикой
     const parserResponse = await RetryHandler.withRetry(async () => {
       const response = await fetch(`${PARSER_SERVICE_URL}/api/scrape`, {
         method: 'POST',
@@ -46,60 +43,53 @@ export async function POST(request) {
       }
 
       return response;
-    }, 3, 1500); // 3 попытки с задержкой 1.5 сек
+    }, 3, 1500);
 
     const result = await parserResponse.json();
 
     if (result.success) {
-      // Создание/обновление пользователя
       const userResult = await userService.createOrUpdateUser(username, password);
-      
-      // Сохранение задач в user_data
+
       if (userResult.userId && result.tasks) {
         await tasksService.saveUserTasks(userResult.userId, result.tasks);
       }
-      
-      // Добавляем информацию о пользователе в ответ
-      result.userAction = userResult.created ? 'created' : 
-                         userResult.updated ? 'updated' : 
-                         userResult.exists ? 'exists' : 'unknown';
 
-      // Логируем успешный вход
+      result.userAction = userResult.created ? 'created' :
+        userResult.updated ? 'updated' :
+          userResult.exists ? 'exists' : 'unknown';
+
       await logsService.logLogin(username, true, result.tasksCount || 0);
     } else {
-      // Логируем неудачную попытку
       await logsService.logLogin(username, false, 0, result.message);
     }
 
     return Response.json(result);
 
   } catch (error) {
-    console.error('API Error:', error);
-    
+
     if (error.code === 'email_exists' || error.status === 422) {
       const result = { success: true, userAction: 'exists' };
       return Response.json(result);
     }
-    
+
     return Response.json(
-      { 
-        message: `❌ Ошибка соединения с сервисом парсера: ${error.message}`,
-        success: false 
+      {
+        message: `❌ Ошибка соединения с сервисом парсера`,
+        success: false
       },
       { status: 500 }
     );
   }
 }
 
-// Функция для получения сохраненных задач пользователя
 async function getStoredUserTasks(username) {
   try {
     const { data: { users }, error: listError } = await adminSupabase.auth.admin.listUsers();
     if (listError) throw listError;
-    
+
     const email = userService.isValidEmail(username) ? username : `${username}@guap-temp.com`;
     const existingUser = users.find(u => u.email === email);
-    
+
     if (existingUser) {
       const { data: userData, error: dataError } = await adminSupabase
         .from('user_data')
@@ -116,7 +106,6 @@ async function getStoredUserTasks(username) {
     }
     return null;
   } catch (error) {
-    console.error('Ошибка получения задач из БД:', error);
     throw error;
   }
 }

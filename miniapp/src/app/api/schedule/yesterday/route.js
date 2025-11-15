@@ -1,4 +1,3 @@
-// app/api/schedule/yesterday/route.js
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -11,11 +10,9 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    console.log('📅 Запрашиваем расписание на вчера для пользователя:', userId);
 
     const fastApiUrl = process.env.FASTAPI_URL;
 
-    // 1. Обращаемся к Python бэкенду
     const backendResponse = await fetch(`${fastApiUrl}/schedule/yesterday?uid=${userId}`);
 
     if (!backendResponse.ok) {
@@ -23,13 +20,8 @@ export async function GET(request) {
     }
 
     const backendData = await backendResponse.json();
-    console.log('📊 Ответ от бэкенда (yesterday):', backendData);
 
-    // 2. Проверяем успешность ответа
     if (backendData.success && backendData.schedule) {
-      console.log('✅ Используем расписание на вчера из бэкенда');
-      console.log('   - Количество занятий:', backendData.schedule.schedule?.length || 0);
-      console.log('   - Дата:', backendData.schedule.date_dd_mm);
       
       return Response.json({
         success: true,
@@ -37,7 +29,6 @@ export async function GET(request) {
         source: 'backend'
       });
     } else {
-      console.log('🔄 Расписание на вчера не найдено в бэкенде');
       
       return Response.json({
         success: false,
@@ -48,7 +39,6 @@ export async function GET(request) {
     }
 
   } catch (error) {
-    console.error('❌ Yesterday Schedule API Error:', error);
     return Response.json(
       { 
         message: `❌ Ошибка получения расписания на вчера: ${error.message}`,

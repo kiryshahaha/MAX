@@ -9,7 +9,6 @@ import {
 import { Tag } from "antd";
 
 const DeadlinesSection = ({ tasks, tasksLoading, onUpdateDeadlines }) => {
-  // Функция для парсинга даты из текста
   const parseDate = (dateText) => {
     if (!dateText || dateText === 'Спи спокойно') return Infinity;
 
@@ -21,29 +20,25 @@ const DeadlinesSection = ({ tasks, tasksLoading, onUpdateDeadlines }) => {
     }
   };
 
-  // Функция для форматирования дедлайнов
   const formatDeadlineTasks = (tasks) => {
     if (!tasks || !Array.isArray(tasks)) return [];
 
     return tasks
       .filter(task => {
-        // Фильтруем задачи с валидными дедлайнами (не "Спи спокойно")
         const deadlineText = task.deadline?.text;
         const hasValidDeadline = deadlineText && deadlineText !== 'Спи спокойно';
 
-        // ИСКЛЮЧАЕМ задачи со статусом "принят" или "ожидает проверки"
         const status = task.status?.text?.toLowerCase();
         const hasExcludingStatus = status === 'принят' || status === 'ожидает проверки';
 
         return hasValidDeadline && !hasExcludingStatus;
       })
       .sort((a, b) => {
-        // Сортируем по дате дедлайна
         const dateA = parseDate(a.deadline.text);
         const dateB = parseDate(b.deadline.text);
         return dateA - dateB;
       })
-      .slice(0, 25); // Берем ближайшие дедлайны
+      .slice(0, 25); 
   };
 
   const getDeadlineTagColor = (deadlineText) => {
@@ -56,10 +51,10 @@ const DeadlinesSection = ({ tasks, tasksLoading, onUpdateDeadlines }) => {
       const timeDiff = deadlineDate.getTime() - today.getTime();
       const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
 
-      if (daysDiff < 0) return 'error'; // Просрочено
-      if (daysDiff <= 3) return 'error'; // Меньше 3 дней
-      if (daysDiff <= 7) return 'warning'; // Меньше недели
-      return 'success'; // Больше недели
+      if (daysDiff < 0) return 'error'; 
+      if (daysDiff <= 3) return 'error'; 
+      if (daysDiff <= 7) return 'warning'; 
+      return 'success'; 
     } catch (error) {
       return 'default';
     }
